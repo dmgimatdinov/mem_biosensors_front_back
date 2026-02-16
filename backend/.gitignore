@@ -21,8 +21,9 @@ application-inspector-analyzer/
 .coverage
 .pytest_cache/
 
-# Old streamlit examples
+# Old streamlit examples and backup
 st_examples/
+.old_streamlit_backup/
 
 # Temporary and command files
 freq_analysis/commands-templates
