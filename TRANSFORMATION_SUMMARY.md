@@ -141,6 +141,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 - **CORS properly configured** for development
 - **Input validation** via Pydantic models
 - **Error handling** throughout API
+- **✅ PATCHED**: python-multipart updated from 0.0.20 → 0.0.22 (CVE fix)
 
 ## 🎓 Key Learnings
 
