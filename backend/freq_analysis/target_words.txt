@@ -1,0 +1,8 @@
+sensitivity
+response time
+stability
+reproducibility
+limit of detection
+measurement range
+lifespan
+power consumption

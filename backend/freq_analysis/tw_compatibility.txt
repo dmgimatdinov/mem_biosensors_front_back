@@ -1,0 +1,6 @@
+adhesion
+solubility
+mechanical compatibility
+pH compatibility
+thermal stability
+thermal compatibility
