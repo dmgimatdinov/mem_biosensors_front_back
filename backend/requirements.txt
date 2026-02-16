@@ -1,7 +1,7 @@
 # FastAPI and server dependencies
 fastapi==0.115.0
 uvicorn[standard]==0.34.0
-python-multipart==0.0.20
+python-multipart==0.0.22
 
 # Data processing
 beautifulsoup4==4.12.2
