@@ -412,10 +412,12 @@ async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
 # ==================== Static Files & SPA Routing ====================
 
 # Check if React build directory exists
-frontend_build_path = Path(__file__).parent.parent / "frontend" / "build"
+frontend_build_path = Path(__file__).parent.parent / "frontend" / "out"
 if frontend_build_path.exists():
-    # Mount static files
-    app.mount("/static", StaticFiles(directory=str(frontend_build_path / "static")), name="static")
+    # Mount static files (_next directory contains Next.js assets)
+    next_static_path = frontend_build_path / "_next"
+    if next_static_path.exists():
+        app.mount("/_next", StaticFiles(directory=str(next_static_path)), name="next-static")
     
     # Serve index.html for root and SPA routes
     @app.get("/{full_path:path}")
@@ -425,6 +427,13 @@ if frontend_build_path.exists():
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API endpoint not found")
         
+        # Check if file exists (for static assets)
+        if full_path:
+            file_path = frontend_build_path / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+        
+        # Default to index.html for SPA routing
         index_file = frontend_build_path / "index.html"
         if index_file.exists():
             return FileResponse(index_file)
@@ -432,7 +441,7 @@ if frontend_build_path.exists():
             raise HTTPException(status_code=404, detail="React app not built yet")
 else:
     logger.warning(f"⚠️  Frontend build directory not found at {frontend_build_path}")
-    logger.warning("⚠️  React app will not be served. Build the frontend first.")
+    logger.warning("⚠️  React app will not be served. Build the frontend first with: cd frontend && npm run build")
 
 
 if __name__ == "__main__":
