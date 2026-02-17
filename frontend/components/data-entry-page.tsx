@@ -93,15 +93,26 @@ const TextField = React.memo(function TextField({
 
 interface DataEntryPageProps {
   data: StoreData
-  onSave: (data: StoreData) => void
   showNotification: (msg: string, type: "success" | "error" | "warning" | "info") => void
+  onCreateAnalyte: (analyte: Analyte) => Promise<void>
+  onCreateBioRecognition: (layer: BioRecognitionLayer) => Promise<void>
+  onCreateImmobilization: (layer: ImmobilizationLayer) => Promise<void>
+  onCreateMemristive: (layer: MemristiveLayer) => Promise<void>
 }
 
-export function DataEntryPage({ data, onSave, showNotification }: DataEntryPageProps) {
+export function DataEntryPage({
+  data,
+  showNotification,
+  onCreateAnalyte,
+  onCreateBioRecognition,
+  onCreateImmobilization,
+  onCreateMemristive,
+}: DataEntryPageProps) {
   const [analyte, setAnalyte] = useState<Analyte>(emptyAnalyte())
   const [bre, setBre] = useState<BioRecognitionLayer>(emptyBioRecognition())
   const [im, setIm] = useState<ImmobilizationLayer>(emptyImmobilization())
   const [mem, setMem] = useState<MemristiveLayer>(emptyMemristive())
+  const [saving, setSaving] = useState(false)
   const [duplicateDialog, setDuplicateDialog] = useState<{ open: boolean; duplicates: string[] }>({
     open: false,
     duplicates: [],
@@ -131,7 +142,7 @@ export function DataEntryPage({ data, onSave, showNotification }: DataEntryPageP
     []
   )
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!analyte.ta_id || !analyte.ta_name) {
       showNotification("Analyte ID and Name are required", "error")
       return
@@ -160,37 +171,31 @@ export function DataEntryPage({ data, onSave, showNotification }: DataEntryPageP
       return
     }
 
-    savePassport(false)
+    await savePassport()
   }
 
-  const savePassport = (overwrite: boolean) => {
-    const newData = { ...data }
-
-    if (overwrite) {
-      newData.analytes = newData.analytes.filter((a) => a.ta_id !== analyte.ta_id)
-      newData.bioRecognitions = newData.bioRecognitions.filter((b) => b.bre_id !== bre.bre_id)
-      newData.immobilizations = newData.immobilizations.filter((i) => i.im_id !== im.im_id)
-      newData.memristives = newData.memristives.filter((m) => m.mem_id !== mem.mem_id)
+  const savePassport = async () => {
+    setSaving(true)
+    try {
+      // Save all layers to backend via API
+      await Promise.all([
+        onCreateAnalyte(analyte),
+        onCreateBioRecognition(bre),
+        onCreateImmobilization(im),
+        onCreateMemristive(mem),
+      ])
+      
+      setDuplicateDialog({ open: false, duplicates: [] })
+      showNotification("All layers saved successfully to database", "success")
+      
+      // Clear form after successful save
+      handleClear()
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to save data"
+      showNotification(errorMessage, "error")
+    } finally {
+      setSaving(false)
     }
-
-    newData.analytes = [...newData.analytes, analyte]
-    newData.bioRecognitions = [...newData.bioRecognitions, bre]
-    newData.immobilizations = [...newData.immobilizations, im]
-    newData.memristives = [...newData.memristives, mem]
-    newData.passports = [
-      ...newData.passports,
-      {
-        analyte,
-        bioRecognition: bre,
-        immobilization: im,
-        memristive: mem,
-        createdAt: new Date().toISOString(),
-      },
-    ]
-
-    onSave(newData)
-    setDuplicateDialog({ open: false, duplicates: [] })
-    showNotification("Passport saved successfully", "success")
   }
 
   const handleClear = () => {
@@ -447,15 +452,15 @@ export function DataEntryPage({ data, onSave, showNotification }: DataEntryPageP
 
       {/* Action Buttons */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Button onClick={handleSave} className="h-11 gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button onClick={handleSave} disabled={saving} className="h-11 gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
           <Save className="h-4 w-4" aria-hidden="true" />
-          Save Passport
+          {saving ? "Saving..." : "Save Passport"}
         </Button>
-        <Button onClick={handleClear} variant="secondary" className="h-11 gap-2">
+        <Button onClick={handleClear} variant="secondary" disabled={saving} className="h-11 gap-2">
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           Clear Form
         </Button>
-        <Button onClick={() => setLoadDialog(true)} className="h-11 gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
+        <Button onClick={() => setLoadDialog(true)} disabled={saving} className="h-11 gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
           <FolderOpen className="h-4 w-4" aria-hidden="true" />
           Load Passport
         </Button>
@@ -467,7 +472,7 @@ export function DataEntryPage({ data, onSave, showNotification }: DataEntryPageP
           <DialogHeader>
             <DialogTitle className="text-foreground">Duplicates Found</DialogTitle>
             <DialogDescription>
-              The following entries already exist in the database. Do you want to overwrite them?
+              The following entries already exist in the database. Creating duplicates is not allowed.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted p-3">
@@ -479,10 +484,7 @@ export function DataEntryPage({ data, onSave, showNotification }: DataEntryPageP
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDuplicateDialog({ open: false, duplicates: [] })}>
-              Cancel
-            </Button>
-            <Button onClick={() => savePassport(true)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Overwrite
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
