@@ -42,8 +42,7 @@ interface UseDataState<T> {
  * Generic data fetching hook
  */
 function useDataFetch<T>(
-  fetchFn: () => Promise<T>,
-  dependencies: any[] = []
+  fetchFn: () => Promise<T>
 ): UseDataState<T> {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,7 +65,7 @@ function useDataFetch<T>(
 
   useEffect(() => {
     refetch()
-  }, dependencies)
+  }, [refetch])
 
   return { data, loading, error, refetch }
 }
@@ -177,47 +176,53 @@ export function useBiosensorData(): UseDataState<StoreData> & {
  * Hook to fetch statistics
  */
 export function useStatistics() {
-  return useDataFetch(getStatistics, [])
+  return useDataFetch(getStatistics)
 }
 
 /**
  * Hook to fetch best combinations
  */
 export function useBestCombinations(limit = 10) {
-  return useDataFetch(() => getBestCombinations(limit), [limit])
+  const fetchFn = useCallback(() => getBestCombinations(limit), [limit])
+  return useDataFetch(fetchFn)
 }
 
 /**
  * Hook to fetch analytes only
  */
 export function useAnalytes(limit = 50, offset = 0) {
-  return useDataFetch(() => getAnalytes(limit, offset), [limit, offset])
+  const fetchFn = useCallback(() => getAnalytes(limit, offset), [limit, offset])
+  return useDataFetch(fetchFn)
 }
 
 /**
  * Hook to fetch bio recognition layers only
  */
 export function useBioRecognitionLayers(limit = 50, offset = 0) {
-  return useDataFetch(() => getBioRecognitionLayers(limit, offset), [limit, offset])
+  const fetchFn = useCallback(() => getBioRecognitionLayers(limit, offset), [limit, offset])
+  return useDataFetch(fetchFn)
 }
 
 /**
  * Hook to fetch immobilization layers only
  */
 export function useImmobilizationLayers(limit = 50, offset = 0) {
-  return useDataFetch(() => getImmobilizationLayers(limit, offset), [limit, offset])
+  const fetchFn = useCallback(() => getImmobilizationLayers(limit, offset), [limit, offset])
+  return useDataFetch(fetchFn)
 }
 
 /**
  * Hook to fetch memristive layers only
  */
 export function useMemristiveLayers(limit = 50, offset = 0) {
-  return useDataFetch(() => getMemristiveLayers(limit, offset), [limit, offset])
+  const fetchFn = useCallback(() => getMemristiveLayers(limit, offset), [limit, offset])
+  return useDataFetch(fetchFn)
 }
 
 /**
  * Hook to fetch combinations only
  */
 export function useCombinations(limit = 50, offset = 0) {
-  return useDataFetch(() => getCombinations(limit, offset), [limit, offset])
+  const fetchFn = useCallback(() => getCombinations(limit, offset), [limit, offset])
+  return useDataFetch(fetchFn)
 }
