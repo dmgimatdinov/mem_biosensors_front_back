@@ -13,6 +13,113 @@ import type {
 } from "./biosensor-store"
 
 /**
+ * Field name mappings between frontend (snake_case) and backend (PascalCase_with_underscores)
+ */
+const ANALYTE_FIELD_MAP: Record<keyof Analyte, string> = {
+  ta_id: "TA_ID",
+  ta_name: "TA_Name",
+  ph_min: "PH_Min",
+  ph_max: "PH_Max",
+  t_max: "T_Max",
+  stability: "ST",
+  half_life: "HL",
+  power_consumption: "PC",
+}
+
+const BIO_RECOGNITION_FIELD_MAP: Record<keyof BioRecognitionLayer, string> = {
+  bre_id: "BRE_ID",
+  bre_name: "BRE_Name",
+  ph_min: "PH_Min",
+  ph_max: "PH_Max",
+  t_min: "T_Min",
+  t_max: "T_Max",
+  dr_min: "DR_Min",
+  dr_max: "DR_Max",
+  sensitivity: "SN",
+  reproducibility: "RP",
+  response_time: "TR",
+  stability: "ST",
+  lod: "LOD",
+  durability: "HL",
+  power_consumption: "PC",
+}
+
+const IMMOBILIZATION_FIELD_MAP: Record<keyof ImmobilizationLayer, string> = {
+  im_id: "IM_ID",
+  im_name: "IM_Name",
+  ph_min: "PH_Min",
+  ph_max: "PH_Max",
+  t_min: "T_Min",
+  t_max: "T_Max",
+  young_modulus: "MP",
+  adhesion: "Adh",
+  solubility: "Sol",
+  loss_coefficient: "K_IM",
+  reproducibility: "RP",
+  response_time: "TR",
+  stability: "ST",
+  durability: "HL",
+  power_consumption: "PC",
+}
+
+const MEMRISTIVE_FIELD_MAP: Record<keyof MemristiveLayer, string> = {
+  mem_id: "MEM_ID",
+  mem_name: "MEM_Name",
+  ph_min: "PH_Min",
+  ph_max: "PH_Max",
+  t_min: "T_Min",
+  t_max: "T_Max",
+  dr_min: "DR_Min",
+  dr_max: "DR_Max",
+  young_modulus: "MP",
+  sensitivity: "SN",
+  reproducibility: "RP",
+  response_time: "TR",
+  stability: "ST",
+  lod: "LOD",
+  durability: "HL",
+  power_consumption: "PC",
+}
+
+const COMBINATION_FIELD_MAP: Record<keyof SensorCombination, string> = {
+  id: "Combo_ID",
+  ta_id: "TA_ID",
+  bre_id: "BRE_ID",
+  im_id: "IM_ID",
+  mem_id: "MEM_ID",
+  score: "Score",
+  createdAt: "created_at",
+}
+
+/**
+ * Convert frontend object to backend format
+ */
+function toBackendFormat<T>(obj: T, fieldMap: Record<string, string>): Record<string, any> {
+  const result: Record<string, any> = {}
+  for (const [frontendKey, backendKey] of Object.entries(fieldMap)) {
+    const value = (obj as any)[frontendKey]
+    if (value !== undefined) {
+      result[backendKey] = value
+    }
+  }
+  return result
+}
+
+/**
+ * Convert backend object to frontend format
+ */
+function fromBackendFormat<T>(obj: Record<string, any>, fieldMap: Record<string, string>): Partial<T> {
+  const result: Record<string, any> = {}
+  for (const [frontendKey, backendKey] of Object.entries(fieldMap)) {
+    const value = obj[backendKey]
+    if (value !== undefined) {
+      result[frontendKey] = value
+    }
+  }
+  return result as Partial<T>
+}
+
+/**
  * API Response Types
  */
 interface SuccessResponse {
@@ -107,13 +214,15 @@ export async function checkHealth(): Promise<{ status: string; message: string }
  * Analytes API
  */
 export async function getAnalytes(limit = 50, offset = 0): Promise<Analyte[]> {
-  return fetchApi(`${API_ENDPOINTS.analytes}?limit=${limit}&offset=${offset}`)
+  const backendData = await fetchApi<any[]>(`${API_ENDPOINTS.analytes}?limit=${limit}&offset=${offset}`)
+  return backendData.map(item => fromBackendFormat<Analyte>(item, ANALYTE_FIELD_MAP) as Analyte)
 }
 
 export async function createAnalyte(analyte: Analyte): Promise<SuccessResponse> {
+  const backendData = toBackendFormat(analyte, ANALYTE_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.analytes, {
     method: "POST",
-    body: JSON.stringify(analyte),
+    body: JSON.stringify(backendData),
   })
 }
 
@@ -121,13 +230,15 @@ export async function createAnalyte(analyte: Analyte): Promise<SuccessResponse> 
  * Bio Recognition Layers API
  */
 export async function getBioRecognitionLayers(limit = 50, offset = 0): Promise<BioRecognitionLayer[]> {
-  return fetchApi(`${API_ENDPOINTS.bioRecognition}?limit=${limit}&offset=${offset}`)
+  const backendData = await fetchApi<any[]>(`${API_ENDPOINTS.bioRecognition}?limit=${limit}&offset=${offset}`)
+  return backendData.map(item => fromBackendFormat<BioRecognitionLayer>(item, BIO_RECOGNITION_FIELD_MAP) as BioRecognitionLayer)
 }
 
 export async function createBioRecognitionLayer(layer: BioRecognitionLayer): Promise<SuccessResponse> {
+  const backendData = toBackendFormat(layer, BIO_RECOGNITION_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.bioRecognition, {
     method: "POST",
-    body: JSON.stringify(layer),
+    body: JSON.stringify(backendData),
   })
 }
 
@@ -135,13 +246,15 @@ export async function createBioRecognitionLayer(layer: BioRecognitionLayer): Pro
  * Immobilization Layers API
  */
 export async function getImmobilizationLayers(limit = 50, offset = 0): Promise<ImmobilizationLayer[]> {
-  return fetchApi(`${API_ENDPOINTS.immobilization}?limit=${limit}&offset=${offset}`)
+  const backendData = await fetchApi<any[]>(`${API_ENDPOINTS.immobilization}?limit=${limit}&offset=${offset}`)
+  return backendData.map(item => fromBackendFormat<ImmobilizationLayer>(item, IMMOBILIZATION_FIELD_MAP) as ImmobilizationLayer)
 }
 
 export async function createImmobilizationLayer(layer: ImmobilizationLayer): Promise<SuccessResponse> {
+  const backendData = toBackendFormat(layer, IMMOBILIZATION_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.immobilization, {
     method: "POST",
-    body: JSON.stringify(layer),
+    body: JSON.stringify(backendData),
   })
 }
 
@@ -149,13 +262,15 @@ export async function createImmobilizationLayer(layer: ImmobilizationLayer): Pro
  * Memristive Layers API
  */
 export async function getMemristiveLayers(limit = 50, offset = 0): Promise<MemristiveLayer[]> {
-  return fetchApi(`${API_ENDPOINTS.memristive}?limit=${limit}&offset=${offset}`)
+  const backendData = await fetchApi<any[]>(`${API_ENDPOINTS.memristive}?limit=${limit}&offset=${offset}`)
+  return backendData.map(item => fromBackendFormat<MemristiveLayer>(item, MEMRISTIVE_FIELD_MAP) as MemristiveLayer)
 }
 
 export async function createMemristiveLayer(layer: MemristiveLayer): Promise<SuccessResponse> {
+  const backendData = toBackendFormat(layer, MEMRISTIVE_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.memristive, {
     method: "POST",
-    body: JSON.stringify(layer),
+    body: JSON.stringify(backendData),
   })
 }
 
@@ -163,7 +278,8 @@ export async function createMemristiveLayer(layer: MemristiveLayer): Promise<Suc
  * Combinations API
  */
 export async function getCombinations(limit = 50, offset = 0): Promise<SensorCombination[]> {
-  return fetchApi(`${API_ENDPOINTS.combinations}?limit=${limit}&offset=${offset}`)
+  const backendData = await fetchApi<any[]>(`${API_ENDPOINTS.combinations}?limit=${limit}&offset=${offset}`)
+  return backendData.map(item => fromBackendFormat<SensorCombination>(item, COMBINATION_FIELD_MAP) as SensorCombination)
 }
 
 export async function synthesizeCombinations(maxCombinations = 10000): Promise<SynthesizeResponse> {
