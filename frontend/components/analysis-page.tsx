@@ -31,15 +31,14 @@ import {
   Cell,
 } from "recharts"
 import type { StoreData, SensorCombination } from "@/lib/biosensor-store"
-import { synthesizeCombinations } from "@/lib/biosensor-store"
 
 interface AnalysisPageProps {
   data: StoreData
-  onSave: (data: StoreData) => void
   showNotification: (msg: string, type: "success" | "error" | "warning" | "info") => void
+  onSynthesizeCombinations: (max: number) => Promise<{ checked: number; created: number }>
 }
 
-export function AnalysisPage({ data, onSave, showNotification }: AnalysisPageProps) {
+export function AnalysisPage({ data, showNotification, onSynthesizeCombinations }: AnalysisPageProps) {
   const [synthesizing, setSynthesizing] = useState(false)
   const [topN, setTopN] = useState([10])
   const [selectedCombo, setSelectedCombo] = useState<string>("")
@@ -73,17 +72,20 @@ export function AnalysisPage({ data, onSave, showNotification }: AnalysisPagePro
     return buckets
   }, [data.combinations])
 
-  const handleSynthesize = () => {
+  const handleSynthesize = async () => {
     setSynthesizing(true)
-    setTimeout(() => {
-      const result = synthesizeCombinations(data)
-      onSave(result.updatedData)
-      setSynthesizing(false)
+    try {
+      const result = await onSynthesizeCombinations(10000)
       showNotification(
         `Synthesis complete: ${result.checked} checked, ${result.created} new combinations created`,
         "success"
       )
-    }, 1500)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to synthesize combinations"
+      showNotification(errorMessage, "error")
+    } finally {
+      setSynthesizing(false)
+    }
   }
 
   const selectedComboData = useMemo((): SensorCombination | undefined => {
