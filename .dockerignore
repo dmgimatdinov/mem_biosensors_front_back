@@ -1,0 +1,44 @@
+# Root .dockerignore — exclude files that should not be sent to the Docker build context
+
+# Version control
+.git
+.gitignore
+
+# Node dependencies (re-installed during build)
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# Python caches
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+backend/.pytest_cache
+backend/.coverage
+
+# SQLite database (mounted via volume in production)
+backend/*.db
+
+# Logs
+backend/logs/
+**/*.log
+
+# IDE / editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Environment files with secrets (use env vars or Docker secrets instead)
+.env
+frontend/.env.local
+backend/.env
+
+# Docs / readmes (not needed in the image)
+*.md
+docs/
