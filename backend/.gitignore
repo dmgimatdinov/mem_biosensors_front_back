@@ -30,3 +30,5 @@ freq_analysis/commands-templates
 google_patents_parser/commands-templates
 google_patents_parser/links-file
 AnalyticsReport
+
+venv
