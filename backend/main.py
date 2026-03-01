@@ -32,14 +32,18 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS middleware for React development server
+# CORS middleware for React development server and Cloudflare Pages.
+# Replace the wildcard *.pages.dev / *.workers.dev entries with your
+# specific project URL (e.g. https://your-project.pages.dev) once known.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
-        "http://127.0.0.1:8000"
+        "http://127.0.0.1:8000",
+        "https://*.pages.dev",
+        "https://*.workers.dev",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -411,9 +415,16 @@ async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
 
 # ==================== Static Files & SPA Routing ====================
 
-# Check if React build directory exists
-frontend_build_path = Path(__file__).parent.parent / "frontend" / "out"
-if frontend_build_path.exists():
+# Resolve frontend build directory:
+#   - Production / Cloudflare build: <repo_root>/dist  (produced by build.sh)
+#   - Local development:             <repo_root>/frontend/out  (produced by `npm run build`)
+_repo_root = Path(__file__).parent.parent
+_candidates = [
+    _repo_root / "dist",
+    _repo_root / "frontend" / "out",
+]
+frontend_build_path = next((p for p in _candidates if p.exists()), None)
+if frontend_build_path is not None:
     # Mount static files (_next directory contains Next.js assets)
     next_static_path = frontend_build_path / "_next"
     if next_static_path.exists():
@@ -440,7 +451,7 @@ if frontend_build_path.exists():
         else:
             raise HTTPException(status_code=404, detail="React app not built yet")
 else:
-    logger.warning(f"⚠️  Frontend build directory not found at {frontend_build_path}")
+    logger.warning("⚠️  Frontend build directory not found (checked: dist/, frontend/out/)")
     logger.warning("⚠️  React app will not be served. Build the frontend first with: cd frontend && npm run build")
 
 

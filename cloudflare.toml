@@ -1,0 +1,11 @@
+# Cloudflare Pages deployment configuration
+# https://developers.cloudflare.com/pages/configuration/build-configuration/
+
+[build]
+command = "bash build.sh"
+destination = "dist"
+
+[build.environment]
+NODE_VERSION = "20"
+PYTHON_VERSION = "3.12"
+NODE_ENV = "production"
