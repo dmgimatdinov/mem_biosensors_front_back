@@ -649,6 +649,32 @@ class DatabaseManager(DatabaseAdapter):
             self.logger.error(f"Ошибка проверки существования мемристивного слоя: {e}")
             return False
 
+    # Field mappings from snake_case API format to DB column format
+    _FIELD_MAP = {
+        'analyte': {
+            'ta_id': 'TA_ID', 'ta_name': 'TA_Name', 'ph_min': 'PH_Min', 'ph_max': 'PH_Max',
+            't_max': 'T_Max', 'stability': 'ST', 'half_life': 'HL', 'power_consumption': 'PC',
+        },
+        'bio_recognition': {
+            'bre_id': 'BRE_ID', 'bre_name': 'BRE_Name', 'ph_min': 'PH_Min', 'ph_max': 'PH_Max',
+            't_min': 'T_Min', 't_max': 'T_Max', 'sensitivity': 'SN', 'dr_min': 'DR_Min',
+            'dr_max': 'DR_Max', 'reproducibility': 'RP', 'response_time': 'TR', 'stability': 'ST',
+            'lod': 'LOD', 'durability': 'HL', 'power_consumption': 'PC',
+        },
+        'immobilization': {
+            'im_id': 'IM_ID', 'im_name': 'IM_Name', 'ph_min': 'PH_Min', 'ph_max': 'PH_Max',
+            't_min': 'T_Min', 't_max': 'T_Max', 'young_modulus': 'MP', 'adhesion': 'Adh',
+            'solubility': 'Sol', 'loss_coefficient': 'K_IM', 'reproducibility': 'RP',
+            'response_time': 'TR', 'stability': 'ST', 'durability': 'HL', 'power_consumption': 'PC',
+        },
+        'memristive': {
+            'mem_id': 'MEM_ID', 'mem_name': 'MEM_Name', 'ph_min': 'PH_Min', 'ph_max': 'PH_Max',
+            't_min': 'T_Min', 't_max': 'T_Max', 'young_modulus': 'MP', 'sensitivity': 'SN',
+            'dr_min': 'DR_Min', 'dr_max': 'DR_Max', 'reproducibility': 'RP', 'response_time': 'TR',
+            'stability': 'ST', 'lod': 'LOD', 'durability': 'HL', 'power_consumption': 'PC',
+        },
+    }
+
     # DatabaseAdapter methods implementation
     def insert(self, entity_type: str, data: Dict[str, Any]) -> Any:
         """Универсальный insert на основе специфичных методов"""
@@ -658,11 +684,16 @@ class DatabaseManager(DatabaseAdapter):
             'immobilization': self.insert_immobilization_layer,
             'memristive': self.insert_memristive_layer,
         }
-        
+
         insert_method = methods.get(entity_type)
         if not insert_method:
             return f"Неизвестный тип: {entity_type}"
-        
+
+        # Convert snake_case API keys to DB column format if needed
+        field_map = self._FIELD_MAP.get(entity_type, {})
+        if field_map:
+            data = {field_map.get(k, k): v for k, v in data.items()}
+
         return insert_method(data)
     
     def list_all_paginated(self, entity_type: str, limit: int, offset: int) -> List[Dict]:
