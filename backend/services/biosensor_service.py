@@ -98,10 +98,10 @@ SENSOR_LAYERS_CONFIG = {
     },
     
     'memristive': {
-        'required_fields': {'mr_id', 'mr_name'},
+        'required_fields': {'mem_id', 'mem_name'},
         'constraints': {
-            'mr_id': {'type': str, 'pattern': r'^MR[A-Z0-9_-]{1,20}$'},
-            'mr_name': {'type': str, 'min_length': 3, 'max_length': 255},
+            'mem_id': {'type': str, 'pattern': r'^MEM[A-Z0-9_-]{1,20}$'},
+            'mem_name': {'type': str, 'min_length': 3, 'max_length': 255},
             'ph_min': {'type': float, 'min': 2.0, 'max': 10.0},
             'ph_max': {'type': float, 'min': 2.0, 'max': 10.0},
             't_min': {'type': int, 'min': 5, 'max': 120},
@@ -117,7 +117,7 @@ SENSOR_LAYERS_CONFIG = {
             'durability': {'type': int, 'min': 0, 'max': 100000},
             'power_consumption': {'type': int, 'min': 0, 'max': 1000},
         },
-        'id_field': 'mr_id'
+        'id_field': 'mem_id'
     }
 }
 
