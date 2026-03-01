@@ -35,11 +35,8 @@ info "Installing system prerequisites (curl, git, build-essential, ca-certificat
 apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    gnupg \
     git \
-    build-essential \
-    gcc \
-    g++
+    build-essential
 
 # ─── 2. Python ───────────────────────────────────────────────────────────────
 info "Installing Python 3, pip, and venv…"
