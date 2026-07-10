@@ -228,7 +228,7 @@ class CombinationValidator:
     def check_mechanical_compatibility(
         immob_mp: float,
         mem_mp: float,
-        mp_tolerance: float = 0.5,
+        mp_tolerance: float = 50.0,
     ) -> Tuple[bool, Optional[str]]:
         """Проверка механической совместимости слоёв."""
         if abs(immob_mp - mem_mp) > mp_tolerance:
@@ -265,6 +265,13 @@ class CombinationValidator:
             immob_layer['T_Min'], immob_layer['T_Max'],
             mem_layer['T_Min'], mem_layer['T_Max'],
         )
+        if not ok:
+            return False, msg
+
+        # Механика
+        immob_mp = immob_layer.get('MP', immob_layer.get('young_modulus', 0))
+        mem_mp = mem_layer.get('MP', mem_layer.get('young_modulus', 0))
+        ok, msg = CombinationValidator.check_mechanical_compatibility(immob_mp, mem_mp)
         if not ok:
             return False, msg
         

@@ -313,12 +313,12 @@ async def get_combinations(
 async def synthesize_combinations(max_combinations: int = Query(10000, ge=1, le=50000)):
     """Synthesize new sensor combinations"""
     try:
-        checked, created = combination_service.synthesize_all_combinations(max_combinations=max_combinations)
+        result = combination_service.synthesize_all_combinations(max_combinations=max_combinations)
         return {
             "success": True,
-            "checked": checked,
-            "created": created,
-            "message": f"✅ Checked {checked} possible combinations, created {created} new ones"
+            "checked": result["checked"],
+            "created": result["created"],
+            "message": f"✅ Checked {result['checked']} possible combinations, created {result['created']} new ones"
         }
     except Exception as e:
         logger.error(f"Error synthesizing combinations: {e}")

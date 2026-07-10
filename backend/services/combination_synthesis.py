@@ -47,7 +47,7 @@ class CombinationSynthesisService:
                     for mem_layer in mem_layers:
                         if total_checked >= max_combinations:
                             logger.info(f"Достигнут лимит {max_combinations} комбинаций")
-                            return total_checked, successfully_created
+                            return {"checked": total_checked, "created": successfully_created}
                         
                         total_checked += 1
                         
@@ -61,7 +61,7 @@ class CombinationSynthesisService:
                             logger.error(f"Ошибка при создании комбинации: {e}")
         
         logger.info(f"Синтез завершён: {total_checked} проверено, {successfully_created} создано")
-        return total_checked, successfully_created
+        return {"checked": total_checked, "created": successfully_created}
     
     def create_combination(
         self,
@@ -76,12 +76,17 @@ class CombinationSynthesisService:
         Returns:
             True если комбинация создана, False иначе
         """
+        analyte = self._normalize_record(analyte, "analyte")
+        bio_layer = self._normalize_record(bio_layer, "bio")
+        immob_layer = self._normalize_record(immob_layer, "immob")
+        mem_layer = self._normalize_record(mem_layer, "mem")
+
         # Валидация совместимости
         is_valid, error_msg = CombinationValidator.validate_combination(
             analyte, bio_layer, immob_layer, mem_layer
         )
         if not is_valid:
-            logger.debug(f"Комбинация {analyte['TA_ID']}-{bio_layer['BRE_ID']}-{immob_layer['IM_ID']}-{mem_layer['MEM_ID']}: {error_msg}")
+            logger.debug(f"Комбинация {analyte.get('TA_ID', analyte.get('ta_id'))}-{bio_layer.get('BRE_ID', bio_layer.get('bre_id'))}-{immob_layer.get('IM_ID', immob_layer.get('im_id'))}-{mem_layer.get('MEM_ID', mem_layer.get('mem_id'))}: {error_msg}")
             return False
         
         # Расчёт интегральных метрик
@@ -91,15 +96,15 @@ class CombinationSynthesisService:
         score = self._calculate_score(metrics)
         
         # ID комбинации
-        combo_id = f"COMBO_{analyte['TA_ID']}_{bio_layer['BRE_ID']}_{immob_layer['IM_ID']}_{mem_layer['MEM_ID']}"
+        combo_id = f"COMBO_{analyte.get('TA_ID', analyte.get('ta_id'))}_{bio_layer.get('BRE_ID', bio_layer.get('bre_id'))}_{immob_layer.get('IM_ID', immob_layer.get('im_id'))}_{mem_layer.get('MEM_ID', mem_layer.get('mem_id'))}"
         
         # Подготовка данных для БД
         combination_data = {
             'Combo_ID': combo_id,
-            'TA_ID': analyte['TA_ID'],
-            'BRE_ID': bio_layer['BRE_ID'],
-            'IM_ID': immob_layer['IM_ID'],
-            'MEM_ID': mem_layer['MEM_ID'],
+            'TA_ID': analyte.get('TA_ID', analyte.get('ta_id')),
+            'BRE_ID': bio_layer.get('BRE_ID', bio_layer.get('bre_id')),
+            'IM_ID': immob_layer.get('IM_ID', immob_layer.get('im_id')),
+            'MEM_ID': mem_layer.get('MEM_ID', mem_layer.get('mem_id')),
             'SN_total': metrics['SN_total'],
             'TR_total': metrics['TR_total'],
             'ST_total': metrics['ST_total'],
@@ -124,6 +129,84 @@ class CombinationSynthesisService:
             logger.error(f"❌ Ошибка при добавлении комбинации {combo_id}")
             return False
     
+    @staticmethod
+    def _normalize_record(record: Dict[str, Any], kind: str) -> Dict[str, Any]:
+        normalized = {}
+        for key, value in record.items():
+            normalized[key] = value
+
+        aliases = {
+            "analyte": {
+                "TA_ID": "ta_id",
+                "TA_Name": "ta_name",
+                "PH_Min": "ph_min",
+                "PH_Max": "ph_max",
+                "T_Max": "t_max",
+                "ST": "stability",
+                "HL": "half_life",
+                "PC": "power_consumption",
+            },
+            "bio": {
+                "BRE_ID": "bre_id",
+                "BRE_Name": "bre_name",
+                "PH_Min": "ph_min",
+                "PH_Max": "ph_max",
+                "T_Min": "t_min",
+                "T_Max": "t_max",
+                "SN": "sensitivity",
+                "DR_Min": "dr_min",
+                "DR_Max": "dr_max",
+                "RP": "reproducibility",
+                "TR": "response_time",
+                "ST": "stability",
+                "LOD": "lod",
+                "HL": "durability",
+                "PC": "power_consumption",
+            },
+            "immob": {
+                "IM_ID": "im_id",
+                "IM_Name": "im_name",
+                "PH_Min": "ph_min",
+                "PH_Max": "ph_max",
+                "T_Min": "t_min",
+                "T_Max": "t_max",
+                "MP": "young_modulus",
+                "Adh": "adhesion",
+                "Sol": "solubility",
+                "K_IM": "loss_coefficient",
+                "RP": "reproducibility",
+                "TR": "response_time",
+                "ST": "stability",
+                "HL": "durability",
+                "PC": "power_consumption",
+            },
+            "mem": {
+                "MEM_ID": "mem_id",
+                "MEM_Name": "mem_name",
+                "PH_Min": "ph_min",
+                "PH_Max": "ph_max",
+                "T_Min": "t_min",
+                "T_Max": "t_max",
+                "MP": "young_modulus",
+                "SN": "sensitivity",
+                "DR_Min": "dr_min",
+                "DR_Max": "dr_max",
+                "RP": "reproducibility",
+                "TR": "response_time",
+                "ST": "stability",
+                "LOD": "lod",
+                "HL": "durability",
+                "PC": "power_consumption",
+            },
+        }
+        mapping = aliases.get(kind, {})
+        for upper, lower in mapping.items():
+            if upper not in normalized and lower in normalized:
+                normalized[upper] = normalized[lower]
+            if lower not in normalized and upper in normalized:
+                normalized[lower] = normalized[upper]
+        return normalized
+
     @staticmethod
     def _calculate_metrics(
         analyte: Dict, bio: Dict, immob: Dict, mem: Dict

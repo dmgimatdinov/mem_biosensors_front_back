@@ -280,3 +280,14 @@ def make_incompatible_four_layers(
         memristive_layer = make_memristive_layer(young_modulus=100)  # 100 GPa (diff = 90 > 50)
 
     return analyte, bio_layer, immobilization_layer, memristive_layer
+
+
+def generate_random_metrics() -> Dict[str, Any]:
+    return {
+        "sn_total": random.randint(1, 20000),
+        "tr_total": random.randint(1, 3600),
+        "st_total": random.randint(1, 365),
+        "lod_total": random.randint(1, 50000),
+        "dr_total": random.randint(0, 1000),
+        "pc_total": random.randint(1, 2000),
+    }
