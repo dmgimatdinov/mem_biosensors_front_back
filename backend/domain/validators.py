@@ -1,56 +1,176 @@
 # domain/validators.py
 
-from typing import Dict, Any, Tuple, Optional
+from dataclasses import dataclass, field
+from typing import Dict, Any, Tuple, Optional, List
 from domain.models import Analyte, BioRecognitionLayer
 from domain.config import FIELD_CONSTRAINTS
 
+
+@dataclass
+class ValidationResult:
+    """Результат валидации данных."""
+    success: bool
+    errors: List[str] = field(default_factory=list)
+
+
+# Ограничения для строковых полей (префиксы, длина)
+STRING_CONSTRAINTS = {
+    "analyte": {
+        "ta_id": {"prefix": "ta", "min_length": 3, "max_length": 20},
+        "ta_name": {"min_length": 3, "max_length": 200},
+    },
+    "bio_recognition": {
+        "bre_id": {"prefix": "bre", "min_length": 4, "max_length": 20},
+        "bre_name": {"min_length": 3, "max_length": 200},
+    },
+    "immobilization": {
+        "im_id": {"prefix": "im", "min_length": 3, "max_length": 20},
+        "im_name": {"min_length": 3, "max_length": 200},
+    },
+    "memristive": {
+        "mem_id": {"prefix": "mem", "min_length": 4, "max_length": 20},
+        "mem_name": {"min_length": 3, "max_length": 200},
+    },
+}
+
+# Обязательные поля
+REQUIRED_FIELDS = {
+    "analyte": ["ta_id", "ta_name"],
+    "bio_recognition": ["bre_id", "bre_name"],
+    "immobilization": ["im_id", "im_name"],
+    "memristive": ["mem_id", "mem_name"],
+}
+
+# Enum-поля (допустимые значения)
+ENUM_FIELDS = {
+    "immobilization": {
+        "adhesion": ["низкая", "средняя", "высокая", "хорошая", "отличная", "слабая"],
+        "solubility": ["водорастворимый", "органический", "нерастворимый"],
+    },
+}
+
+# Логические связи: min <= max
+LOGICAL_PAIRS = {
+    "analyte": [("ph_min", "ph_max")],
+    "bio_recognition": [("ph_min", "ph_max"), ("t_min", "t_max"), ("dr_min", "dr_max")],
+    "immobilization": [],
+    "memristive": [("dr_min", "dr_max")],
+}
+
+# Маппинг имён полей для отображения в сообщениях об ошибках
+FIELD_DISPLAY_NAMES = {
+    "ph_min": "pH_min",
+    "ph_max": "pH_max",
+    "t_min": "T_min",
+    "t_max": "T_max",
+    "dr_min": "DR_min",
+    "dr_max": "DR_max",
+}
+
+
 class DataValidator:
-    """Валидация данных моделей."""
-    
+    """Универсальный валидатор данных биосенсора."""
+
+    @staticmethod
+    def validate(layer_type: str, data: Dict[str, Any]) -> ValidationResult:
+        """
+        Универсальный метод валидации для любого слоя.
+        
+        :param layer_type: analyte | bio_recognition | immobilization | memristive
+        :param data: словарь с данными (от фабрик)
+        :return: ValidationResult с флагом success и списком ошибок
+        """
+        errors: List[str] = []
+
+        # 1. СНАЧАЛА проверяем обязательные поля
+        missing_fields = []
+        for field_name in REQUIRED_FIELDS.get(layer_type, []):
+            if field_name not in data or data[field_name] is None or data[field_name] == "":
+                missing_fields.append(field_name)
+
+        if missing_fields:
+            # Сообщение должно содержать "обязательны"
+            errors.append(f"Поля {', '.join(missing_fields)} обязательны")
+            return ValidationResult(success=False, errors=errors)
+
+        # 2. Строковые поля (префикс, длина) - регистронезависимая проверка префикса
+        for field_name, constraints in STRING_CONSTRAINTS.get(layer_type, {}).items():
+            if field_name not in data or data[field_name] is None:
+                continue
+            value = data[field_name]
+            if not isinstance(value, str):
+                errors.append(f"Поле '{field_name}' должно быть строкой")
+                continue
+
+            # Регистронезависимая проверка префикса
+            if "prefix" in constraints and not value.lower().startswith(constraints["prefix"].lower()):
+                # Сообщение должно содержать "должен начинаться с"
+                errors.append(f"ID должен начинаться с {constraints['prefix']}")
+            
+            if "min_length" in constraints and len(value) < constraints["min_length"]:
+                # Сообщение должно содержать "слишком короткое"
+                errors.append(f"Название слишком короткое")
+            
+            if "max_length" in constraints and len(value) > constraints["max_length"]:
+                # Сообщение должно содержать "слишком длинное"
+                errors.append(f"Поле '{field_name}' слишком длинное (превышает длину {constraints['max_length']})")
+
+        # 3. Enum-поля
+        for field_name, allowed in ENUM_FIELDS.get(layer_type, {}).items():
+            if field_name not in data or data[field_name] is None:
+                continue
+            if data[field_name] not in allowed:
+                errors.append(f"Поле '{field_name}' недопустимое значение")
+
+        # 4. Числовые поля по FIELD_CONSTRAINTS
+        for field_name, constraints in FIELD_CONSTRAINTS.get(layer_type, {}).items():
+            if field_name not in data or data[field_name] is None:
+                continue
+            value = data[field_name]
+            if not isinstance(value, (int, float)):
+                errors.append(f"Поле '{field_name}' должно быть числом")
+                continue
+
+            min_val = constraints.get("min")
+            max_val = constraints.get("max")
+            
+            # Используем отображаемое имя поля (с заглавными буквами)
+            display_name = FIELD_DISPLAY_NAMES.get(field_name, field_name)
+            
+            if min_val is not None and value < min_val:
+                errors.append(f"Поле '{display_name}' вне диапазона")
+            if max_val is not None and value > max_val:
+                errors.append(f"Поле '{display_name}' вне диапазона")
+
+        # 5. Логические связи (min <= max)
+        for min_f, max_f in LOGICAL_PAIRS.get(layer_type, []):
+            if min_f in data and max_f in data:
+                v_min, v_max = data[min_f], data[max_f]
+                if v_min is not None and v_max is not None and v_min > v_max:
+                    # Используем отображаемые имена
+                    display_min = FIELD_DISPLAY_NAMES.get(min_f, min_f)
+                    display_max = FIELD_DISPLAY_NAMES.get(max_f, max_f)
+                    errors.append(f"{display_min} не может быть больше {display_max}")
+
+        return ValidationResult(success=len(errors) == 0, errors=errors)
+
+    # --- Старые методы (сохранены для обратной совместимости) ---
+
     @staticmethod
     def validate_analyte(analyte: Analyte) -> Tuple[bool, Optional[str]]:
-        """Валидация аналита."""
-        # Обязательные поля
-        if not analyte.ta_id or not analyte.ta_name:
-            return False, "ID и название аналита обязательны"
-        
-        # Проверка диапазонов
-        constraints = FIELD_CONSTRAINTS.get('analyte', {})
-        
-        if analyte.ph_min is not None:
-            c = constraints.get('ph_min', {})
-            if not (c.get('min', 0) <= analyte.ph_min <= c.get('max', 14)):
-                return False, f"pH_min вне диапазона {c.get('min')}-{c.get('max')}"
-        
-        if analyte.ph_max is not None:
-            c = constraints.get('ph_max', {})
-            if not (c.get('min', 0) <= analyte.ph_max <= c.get('max', 14)):
-                return False, f"pH_max вне диапазона {c.get('min')}-{c.get('max')}"
-        
-        # Логическая проверка: ph_min <= ph_max
-        if analyte.ph_min and analyte.ph_max and analyte.ph_min > analyte.ph_max:
-            return False, "pH_min не может быть больше pH_max"
-        
-        # Аналогично для других полей...
-        
-        return True, None
-    
+        """Валидация аналита (обратная совместимость)."""
+        result = DataValidator.validate("analyte", analyte.__dict__)
+        if result.success:
+            return True, None
+        return False, result.errors[0] if result.errors else "Ошибка валидации"
+
     @staticmethod
     def validate_bio_recognition_layer(bio: BioRecognitionLayer) -> Tuple[bool, Optional[str]]:
-        """Валидация биослоя."""
-        if not bio.bre_id or not bio.bre_name:
-            return False, "ID и название биослоя обязательны"
-        
-        # Логическая проверка диапазонов
-        if bio.dr_min and bio.dr_max and bio.dr_min > bio.dr_max:
-            return False, "DR_min не может быть больше DR_max"
-        
-        if bio.t_min and bio.t_max and bio.t_min > bio.t_max:
-            return False, "T_min не может быть больше T_max"
-        
-        return True, None
-    
-    # Аналогично для immobilization_layer и memristive_layer...
+        """Валидация биослоя (обратная совместимость)."""
+        result = DataValidator.validate("bio_recognition", bio.__dict__)
+        if result.success:
+            return True, None
+        return False, result.errors[0] if result.errors else "Ошибка валидации"
     
 class CombinationValidator:
     """Валидация совместимости слоёв сенсора."""
