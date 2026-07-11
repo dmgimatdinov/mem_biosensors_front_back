@@ -371,9 +371,9 @@ export function DataEntryPage({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="слабая">Low</SelectItem>
+                      <SelectItem value="хорошая">Medium</SelectItem>
+                      <SelectItem value="отличная">High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -384,9 +384,9 @@ export function DataEntryPage({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="водорастворимый">Low</SelectItem>
+                      <SelectItem value="органический">Medium</SelectItem>
+                      <SelectItem value="нерастворимый">High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
