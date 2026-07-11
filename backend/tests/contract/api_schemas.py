@@ -3,12 +3,13 @@
 Изменение этих схем требует обновления фронтенда.
 """
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 
 
 class BaseResponse(BaseModel):
     """Базовая модель с настройками для PascalCase."""
-    model_config = ConfigDict(populate_by_name=True)
+    # extra="forbid" гарантирует падение тестов при появлении неожиданных полей в API.
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 # ============ Схемы для сущностей ============
@@ -21,8 +22,6 @@ class AnalyteResponse(BaseResponse):
     PH_Max: float = Field(..., ge=2.0, le=10.0)
     T_Max: int = Field(..., ge=0, le=180)
     ST: int = Field(..., ge=0, le=365)
-    HL: int = Field(..., ge=0, le=8760)
-    PC: int = Field(..., ge=0, le=1000)
 
 
 class BioRecognitionResponse(BaseResponse):
@@ -33,15 +32,7 @@ class BioRecognitionResponse(BaseResponse):
     PH_Max: float = Field(..., ge=2.0, le=10.0)
     T_Min: int = Field(..., ge=0, le=100)
     T_Max: int = Field(..., ge=0, le=100)
-    DR_Min: float = Field(..., ge=0)
-    DR_Max: float = Field(..., ge=0)
     SN: int = Field(..., ge=0)
-    RP: int = Field(..., ge=0, le=100)
-    TR: int = Field(..., ge=0)
-    ST: int = Field(..., ge=0, le=365)
-    LOD: int = Field(..., ge=0)
-    HL: int = Field(..., ge=0, le=8760)
-    PC: int = Field(..., ge=0, le=1000)
 
 
 class ImmobilizationResponse(BaseResponse):
@@ -53,14 +44,6 @@ class ImmobilizationResponse(BaseResponse):
     T_Min: int = Field(..., ge=0, le=100)
     T_Max: int = Field(..., ge=0, le=100)
     MP: int = Field(..., ge=0, le=150)
-    Adh: str
-    Sol: str
-    K_IM: float = Field(..., ge=0, le=1.0)
-    RP: int = Field(..., ge=0, le=100)
-    TR: int = Field(..., ge=0)
-    ST: int = Field(..., ge=0, le=365)
-    HL: int = Field(..., ge=0, le=8760)
-    PC: int = Field(..., ge=0, le=1000)
 
 
 class MemristiveResponse(BaseResponse):
@@ -71,16 +54,7 @@ class MemristiveResponse(BaseResponse):
     PH_Max: float = Field(..., ge=2.0, le=10.0)
     T_Min: int = Field(..., ge=0, le=100)
     T_Max: int = Field(..., ge=0, le=100)
-    DR_Min: float = Field(..., ge=0)
-    DR_Max: float = Field(..., ge=0)
-    MP: int = Field(..., ge=0, le=150)
     SN: int = Field(..., ge=0)
-    RP: int = Field(..., ge=0, le=100)
-    TR: int = Field(..., ge=0)
-    ST: int = Field(..., ge=0, le=365)
-    LOD: int = Field(..., ge=0)
-    HL: int = Field(..., ge=0, le=8760)
-    PC: int = Field(..., ge=0, le=1000)
 
 
 class CombinationResponse(BaseResponse):
@@ -120,14 +94,27 @@ class HealthResponse(BaseResponse):
     message: str
 
 
+class StatisticsItem(BaseResponse):
+    """Элемент статистики по отдельной таблице."""
+    label: str
+    count: int = Field(..., ge=0)
+    error: Optional[str] = None
+
+
 class StatisticsResponse(BaseResponse):
     """Схема ответа /api/analytics/statistics."""
-    pass
+    Analytes: StatisticsItem
+    BioRecognitionLayers: StatisticsItem
+    ImmobilizationLayers: StatisticsItem
+    MemristiveLayers: StatisticsItem
+    SensorCombinations: StatisticsItem
 
 
 class SynthesisResponse(BaseResponse):
     """Схема ответа /api/combinations/synthesize."""
+    success: bool
     checked: int = Field(..., ge=0)
     created: int = Field(..., ge=0)
+    message: str
     skipped: Optional[int] = None
     errors: Optional[int] = None

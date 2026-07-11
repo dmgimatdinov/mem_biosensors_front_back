@@ -32,13 +32,13 @@ class TestFieldMapping:
             assert "ph_min" not in analyte
 
     def test_immobilization_special_fields(self, api_client):
-        """Специальные поля иммобилизации (MP, Adh, Sol, K_IM)."""
+        """Специальные поля иммобилизации проверяются в GET /api/immobilization/{id}."""
         data = make_immobilization_layer()
         api_client.post("/api/immobilization", json=data)
 
-        response = api_client.get("/api/immobilization")
+        response = api_client.get(f"/api/immobilization/{data['im_id']}")
         assert response.status_code == 200
-        im = response.json()[0]
+        im = response.json()
 
         assert "MP" in im
         assert "Adh" in im

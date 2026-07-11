@@ -1,5 +1,5 @@
 import pytest
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 from typing import List
 from tests.contract.api_schemas import (
     AnalyteResponse,
@@ -51,3 +51,15 @@ class TestAPIContract:
             for key in analyte.keys():
                 for forbidden in forbidden_keywords:
                     assert forbidden not in key.lower(), f"Found forbidden field: {key}"
+
+    def test_contract_fails_on_missing_required_field(self, api_client):
+        """Контракт падает, если из ответа убрать обязательное поле."""
+        data = api_client.get("/api/analytes").json()
+        if not data:
+            return
+
+        broken_payload = data[0].copy()
+        broken_payload.pop("TA_ID", None)
+
+        with pytest.raises(ValidationError):
+            AnalyteResponse.model_validate(broken_payload)

@@ -8,7 +8,9 @@ from tests.contract.api_schemas import (
     MemristiveResponse,
     CombinationResponse,
     SuccessResponse,
+    ErrorResponse,
     HealthResponse,
+    StatisticsResponse,
     SynthesisResponse,
 )
 from tests.factories import (
@@ -29,7 +31,19 @@ class TestResponseSchemas:
         assert response.status_code == 200
 
         adapter = TypeAdapter(HealthResponse)
-        adapter.validate_python(response.json())
+        validated = adapter.validate_python(response.json())
+        dumped = validated.model_dump()
+        assert set(dumped.keys()) == {"status", "message"}
+
+    def test_statistics_response_schema(self, api_client):
+        """Ответ /api/analytics/statistics соответствует StatisticsResponse."""
+        response = api_client.get("/api/analytics/statistics")
+        assert response.status_code == 200
+
+        validated = StatisticsResponse.model_validate(response.json())
+        dumped = validated.model_dump()
+        assert "Analytes" in dumped
+        assert "SensorCombinations" in dumped
 
     def test_analyte_response_schema(self, api_client):
         """Ответ GET /api/analytes соответствует AnalyteResponse."""
@@ -109,5 +123,6 @@ class TestResponseSchemas:
         """Ответ с ошибкой соответствует ErrorResponse."""
         response = api_client.get("/api/analytes/NONEXISTENT_ID")
         assert response.status_code == 404
-        json_data = response.json()
-        assert "detail" in json_data or "error" in json_data
+
+        adapter = TypeAdapter(ErrorResponse)
+        adapter.validate_python(response.json())
