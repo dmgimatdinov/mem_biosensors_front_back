@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test"
 
+const skipUiE2E = process.env.SKIP_UI_E2E === "true"
+
+test.skip(skipUiE2E, "UI E2E is temporarily skipped in CI until frontend runtime is fully containerized")
+
 const sections = [
   { label: "Data Entry", heading: "Data Entry", action: /Save Passport/ },
   { label: "Database", heading: "Database", action: /Page 1 of/ },

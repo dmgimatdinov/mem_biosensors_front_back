@@ -1,10 +1,21 @@
 import { defineConfig, devices } from "@playwright/test"
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const baseURL = process.env.E2E_BASE_URL ?? process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8000"
-// следующая строка используется при ручном запуске тестов, учитавать это при работе над кодом
-const dockerComposeFile = "C:/Users/dgima/OneDrive/Документы/Projects/VSCode projects/mem_biosensors_front_back/docker-compose.yml"
-//const dockerComposeFile = "C:\\Users\\dgima\\OneDrive\\Документы\\Projects\\VSCode projects\\mem_biosensors_front_back\\docker-compose.yml"
-//"/workspaces/mem_biosensors_front_back/docker-compose.yml"
+
+const defaultComposeCandidates = [
+  process.env.E2E_DOCKER_COMPOSE_FILE,
+  "C:/Users/dgima/OneDrive/Документы/Projects/VSCode projects/mem_biosensors_front_back/docker-compose.yml",
+  "/workspaces/mem_biosensors_front_back/docker-compose.yml",
+  path.resolve(__dirname, "..", "docker-compose.yml"),
+].filter((p): p is string => !!p)
+
+const dockerComposeFile =
+  defaultComposeCandidates.find((candidate) => fs.existsSync(candidate)) ?? defaultComposeCandidates[0]
 
 export default defineConfig({
   testDir: "./tests",

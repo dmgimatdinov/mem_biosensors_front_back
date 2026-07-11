@@ -6,6 +6,10 @@ function uniqueId(prefix: string) {
   return `${prefix}${timestamp}${randomPart}`
 }
 
+const skipUiE2E = process.env.SKIP_UI_E2E === "true"
+
+test.skip(skipUiE2E, "UI E2E is temporarily skipped in CI until frontend runtime is fully containerized")
+
 test("user can create a passport and run synthesis end to end", async ({ page, request }) => {
   const analyteId = uniqueId("TA")
   const breId = uniqueId("BRE")
