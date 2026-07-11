@@ -1,33 +1,72 @@
-# import pytest
-# import sqlite3
-# from db.manager import DBNAME, DatabaseManager
-# from db.exceptions import DatabaseConnectionError
+"""pytest configuration and fixtures for testing FastAPI backend."""
 
-# @pytest.fixture(scope="function")
-# def clean_db(tmp_path):  # tmp_path — pytest temp dir
-#     temp_db = str(tmp_path / "test.db")
-#     db = DatabaseManager(dbname=temp_db)  # Отдельная БД!
-#     yield db
-#     """Создаёт временную БД, чистит после теста."""
-#     # Удалить старую БД
-#     # try:
-#     #     import os
-#     #     if os.path.exists(DBNAME):
-#     #         os.remove(DBNAME)
-#     # except:
-#     #     pass
+import pytest
+import sys
+import os
+from pathlib import Path
+from fastapi.testclient import TestClient
+
+# Add backend to path so imports work
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from main import app
+from db.manager import DatabaseManager
+
+
+@pytest.fixture(scope="function")
+def api_client(tmp_path):
+    """
+    FastAPI TestClient with temporary isolated database.
     
-#     # Создать новую
-#     # db = DatabaseManager()
-#     # yield db
-#     # Teardown: удалить тестовые записи или БД
-#     try:
-#         conn = sqlite3.connect(temp_db)
-#         cursor = conn.cursor()
-#         cursor.execute("DELETE FROM Analytes WHERE TAID LIKE 'TA_TEST%'")
-#         cursor.execute("DELETE FROM BioRecognitionLayers WHERE BREID LIKE 'BRE_TEST%'")
-#         cursor.execute("DELETE FROM ImmobilizationLayers WHERE IMID LIKE 'IM_TEST%'")
-#         cursor.execute("DELETE FROM MemristiveLayers WHERE MEMID LIKE 'MEM_TEST%'")
-#         conn.commit()
-#         conn.close()
-#     except:
+    Each test gets a clean, isolated database to avoid test interference.
+    Uses tmp_path fixture from pytest for automatic cleanup.
+    """
+    # Set up temporary database for this test
+    temp_db_path = str(tmp_path / "test_biosensor.db")
+    os.environ["DATABASE_URL"] = temp_db_path
+    
+    # Create client with the app
+    client = TestClient(app)
+    
+    yield client
+    
+    # Cleanup happens automatically when tmp_path is destroyed
+
+
+@pytest.fixture(params=["analytes", "bio-recognition", "immobilization", "memristive"])
+def entity_endpoint(request):
+    """Parametrized fixture for all entity endpoints."""
+    return f"/api/{request.param}"
+
+
+@pytest.fixture(params=["analyte", "bio_recognition", "immobilization", "memristive"])
+def entity_type(request):
+    """Parametrized fixture for entity type names (used in factories)."""
+    return request.param
+
+
+@pytest.fixture
+def entity_factory(entity_type):
+    """Returns the appropriate factory function for the given entity type."""
+    from tests.factories import (
+        make_analyte,
+        make_bio_recognition_layer,
+        make_immobilization_layer,
+        make_memristive_layer
+    )
+    
+    factories = {
+        "analyte": make_analyte,
+        "bio_recognition": make_bio_recognition_layer,
+        "immobilization": make_immobilization_layer,
+        "memristive": make_memristive_layer
+    }
+    
+    return factories[entity_type]
+
+
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line(
+        "markers", "integration: mark test as an integration test"
+    )
