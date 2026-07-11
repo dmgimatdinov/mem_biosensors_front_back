@@ -52,6 +52,7 @@ jobs:
             -m unit \
             -n auto \
             --cov=backend \
+            --cov-config=.coveragerc \
             --cov-report=xml \
             --cov-report=term-missing \
             --cov-fail-under=70 \
