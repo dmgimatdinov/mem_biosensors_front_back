@@ -55,7 +55,7 @@ const NumberField = React.memo(function NumberField({ label, value, onChange, mi
       </Label>
       <Input
         type="number"
-        value={value}
+        value={value ?? ""}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
         min={min}
         max={max}
@@ -82,7 +82,7 @@ const TextField = React.memo(function TextField({
       <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       <Input
         type="text"
-        value={value}
+        value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="h-10 bg-card text-foreground"
@@ -371,9 +371,9 @@ export function DataEntryPage({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="слабая">Low</SelectItem>
+                      <SelectItem value="хорошая">Medium</SelectItem>
+                      <SelectItem value="отличная">High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -384,9 +384,9 @@ export function DataEntryPage({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="водорастворимый">Low</SelectItem>
+                      <SelectItem value="органический">Medium</SelectItem>
+                      <SelectItem value="нерастворимый">High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

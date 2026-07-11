@@ -1,0 +1,13 @@
+[coverage:run]
+omit =
+    backend/tests/*
+    */__pycache__/*
+    */site-packages/*
+
+[coverage:report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    @(abc\.)?abstractmethod

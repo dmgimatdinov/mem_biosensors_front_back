@@ -1,5 +1,5 @@
 # main.py - FastAPI Backend for Memristive Biosensors
-from fastapi import FastAPI, HTTPException, status, Path as PathParam, Query
+from fastapi import FastAPI, HTTPException, status, Path as PathParam, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -9,6 +9,7 @@ import logging
 import os
 from pathlib import Path
 from io import BytesIO
+from contextlib import asynccontextmanager
 
 # Import business logic services
 from db.manager import DatabaseManager
@@ -21,30 +22,76 @@ from services.combination_synthesis import CombinationSynthesisService
 from domain.models import Analyte, BioRecognitionLayer, ImmobilizationLayer, MemristiveLayer
 from utils.logging_config import setup_logging
 
+
+def _resolve_log_level() -> int:
+    """Resolve logging level from LOG_LEVEL env var with INFO fallback."""
+    raw_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    return getattr(logging, raw_level, logging.INFO)
+
+
+def _resolve_database_path() -> str:
+    """Resolve SQLite path from DATABASE_URL (sqlite:///path.db) or fallback."""
+    db_url = os.getenv("DATABASE_URL", "").strip()
+    if db_url.startswith("sqlite:///"):
+        return db_url.replace("sqlite:///", "", 1)
+    return "memristive_biosensor.db"
+
+
+def _resolve_cors_origins() -> list[str]:
+    """Resolve CORS origins from comma-separated CORS_ORIGINS env var."""
+    raw_origins = os.getenv("CORS_ORIGINS", "").strip()
+    if raw_origins:
+        origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+        if origins:
+            return origins
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
 # Setup logging
-setup_logging(log_file="logs/biosensor.log", level=logging.INFO)
+setup_logging(log_file="logs/biosensor.log", level=_resolve_log_level())
 logger = logging.getLogger(__name__)
+
+DATABASE_PATH = _resolve_database_path()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize services on startup"""
+    global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
+    
+    try:
+        db_manager = DatabaseManager(db_name=DATABASE_PATH)
+        biosensor_service = BiosensorService(db_manager)
+        passport_service = PassportService(db_manager)
+        analytics_service = AnalyticsService(db_manager)
+        export_service = ExportService(db_manager)
+        combination_service = CombinationSynthesisService(db_manager)
+        logger.info("✅ All services initialized successfully")
+    except DatabaseConnectionError as e:
+        logger.error(f"❌ Failed to connect to database: {e}")
+        raise
+
+    yield  # Приложение работает
+
+    # Cleanup при shutdown
+    logger.info("🛑 Shutting down...")
+
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Memristive Biosensors API",
     description="API for managing memristive biosensor passports",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
-# CORS middleware for React development server and Cloudflare Pages.
-# Replace the wildcard *.pages.dev / *.workers.dev entries with your
-# specific project URL (e.g. https://your-project.pages.dev) once known.
+# CORS middleware for React development server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "https://*.pages.dev",
-        "https://*.workers.dev",
-    ],
+    allow_origins=_resolve_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,21 +106,21 @@ export_service = None
 combination_service = None
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
-    try:
-        db_manager = DatabaseManager()
-        biosensor_service = BiosensorService(db_manager)
-        passport_service = PassportService(db_manager)
-        analytics_service = AnalyticsService(db_manager)
-        export_service = ExportService(db_manager)
-        combination_service = CombinationSynthesisService(db_manager)
-        logger.info("✅ All services initialized successfully")
-    except DatabaseConnectionError as e:
-        logger.error(f"❌ Failed to connect to database: {e}")
-        raise
+# @app.on_event("startup")
+# async def startup_event():
+#     """Initialize services on startup"""
+#     global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
+#     try:
+#         db_manager = DatabaseManager(db_name=DATABASE_PATH)
+#         biosensor_service = BiosensorService(db_manager)
+#         passport_service = PassportService(db_manager)
+#         analytics_service = AnalyticsService(db_manager)
+#         export_service = ExportService(db_manager)
+#         combination_service = CombinationSynthesisService(db_manager)
+#         logger.info("✅ All services initialized successfully")
+#     except DatabaseConnectionError as e:
+#         logger.error(f"❌ Failed to connect to database: {e}")
+#         raise
 
 
 # ==================== Pydantic Models for API ====================
@@ -169,15 +216,36 @@ async def health_check():
 
 @app.get("/api/analytes", response_model=List[Dict[str, Any]])
 async def get_analytes(
+    search: str | None = Query(None, min_length=1),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0)
 ):
     """Get all analytes"""
     try:
         analytes = biosensor_service.get_all_entities("analyte", limit=limit, offset=offset)
+        if search:
+            analytes = [
+                item for item in analytes
+                if search.lower() in item.get("TA_Name", "").lower()
+            ]
         return analytes
     except Exception as e:
         logger.error(f"Error fetching analytes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytes/{ta_id}", response_model=Dict[str, Any])
+async def get_analyte_by_id(ta_id: str):
+    """Get a single analyte by ID"""
+    try:
+        analyte = db_manager.get_analyte_by_id(ta_id)
+        if analyte is None:
+            raise HTTPException(status_code=404, detail="Analyte not found")
+        return analyte
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching analyte by id {ta_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -189,6 +257,8 @@ async def create_analyte(analyte: AnalyteCreate):
         success, message = biosensor_service.save_entity("analyte", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
@@ -214,6 +284,21 @@ async def get_bio_recognition(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/bio-recognition/{bre_id}", response_model=Dict[str, Any])
+async def get_bio_recognition_by_id(bre_id: str):
+    """Get a single bio recognition layer by ID"""
+    try:
+        bio_layer = db_manager.get_bio_recognition_layer_by_id(bre_id)
+        if bio_layer is None:
+            raise HTTPException(status_code=404, detail="Bio recognition layer not found")
+        return bio_layer
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching bio recognition layer by id {bre_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/bio-recognition", response_model=SuccessResponse)
 async def create_bio_recognition(layer: BioRecognitionCreate):
     """Create a new bio recognition layer"""
@@ -222,6 +307,8 @@ async def create_bio_recognition(layer: BioRecognitionCreate):
         success, message = biosensor_service.save_entity("bio_recognition", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
@@ -247,6 +334,21 @@ async def get_immobilization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/immobilization/{im_id}", response_model=Dict[str, Any])
+async def get_immobilization_by_id(im_id: str):
+    """Get a single immobilization layer by ID"""
+    try:
+        imm_layer = db_manager.get_immobilization_layer_by_id(im_id)
+        if imm_layer is None:
+            raise HTTPException(status_code=404, detail="Immobilization layer not found")
+        return imm_layer
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching immobilization layer by id {im_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/immobilization", response_model=SuccessResponse)
 async def create_immobilization(layer: ImmobilizationCreate):
     """Create a new immobilization layer"""
@@ -255,6 +357,8 @@ async def create_immobilization(layer: ImmobilizationCreate):
         success, message = biosensor_service.save_entity("immobilization", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
@@ -280,6 +384,21 @@ async def get_memristive(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/memristive/{mem_id}", response_model=Dict[str, Any])
+async def get_memristive_by_id(mem_id: str):
+    """Get a single memristive layer by ID"""
+    try:
+        mem_layer = db_manager.get_memristive_layer_by_id(mem_id)
+        if mem_layer is None:
+            raise HTTPException(status_code=404, detail="Memristive layer not found")
+        return mem_layer
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching memristive layer by id {mem_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/memristive", response_model=SuccessResponse)
 async def create_memristive(layer: MemristiveCreate):
     """Create a new memristive layer"""
@@ -288,6 +407,8 @@ async def create_memristive(layer: MemristiveCreate):
         success, message = biosensor_service.save_entity("memristive", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
@@ -317,12 +438,12 @@ async def get_combinations(
 async def synthesize_combinations(max_combinations: int = Query(10000, ge=1, le=50000)):
     """Synthesize new sensor combinations"""
     try:
-        checked, created = combination_service.synthesize_all_combinations(max_combinations=max_combinations)
+        result = combination_service.synthesize_all_combinations(max_combinations=max_combinations)
         return {
             "success": True,
-            "checked": checked,
-            "created": created,
-            "message": f"✅ Checked {checked} possible combinations, created {created} new ones"
+            "checked": result["checked"],
+            "created": result["created"],
+            "message": f"✅ Checked {result['checked']} possible combinations, created {result['created']} new ones"
         }
     except Exception as e:
         logger.error(f"Error synthesizing combinations: {e}")
@@ -366,31 +487,6 @@ async def get_comparative_analysis():
 
 # ==================== Export Endpoints ====================
 
-@app.get("/api/export/{table_name}")
-async def export_table(
-    table_name: str = PathParam(...),
-    format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')
-):
-    """Export a specific table"""
-    try:
-        content, filename = export_service.export_table(table_name, fmt=format)
-        
-        media_types = {
-            "csv": "text/csv",
-            "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "pdf": "application/pdf"
-        }
-        
-        return StreamingResponse(
-            BytesIO(content),
-            media_type=media_types.get(format, "application/octet-stream"),
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        logger.error(f"Error exporting table: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/api/export/all")
 async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
     """Export all tables"""
@@ -408,23 +504,49 @@ async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
             media_type=media_types.get(format, "application/octet-stream"),
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error(f"Error exporting all tables: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/export/{table_name}")
+async def export_table(
+    table_name: str = PathParam(...),
+    format: str = Query("csv", pattern=r'^(csv|excel|json|pdf)$')
+):
+    """Export a specific table"""
+    try:
+        content, filename = export_service.export_table(table_name, fmt=format)
+        
+        media_types = {
+            "csv": "text/csv",
+            "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "json": "application/json",
+            "pdf": "application/pdf"
+        }
+        
+        return StreamingResponse(
+            BytesIO(content),
+            media_type=media_types.get(format, "application/octet-stream"),
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except ValueError as e:
+        msg = str(e).lower()
+        if "не найдена" in msg or "not found" in msg:
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error exporting table: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== Static Files & SPA Routing ====================
 
-# Resolve frontend build directory:
-#   - Production / Cloudflare build: <repo_root>/dist  (produced by build.sh)
-#   - Local development:             <repo_root>/frontend/out  (produced by `npm run build`)
-_repo_root = Path(__file__).parent.parent
-_candidates = [
-    _repo_root / "dist",
-    _repo_root / "frontend" / "out",
-]
-frontend_build_path = next((p for p in _candidates if p.exists()), None)
-if frontend_build_path is not None:
+# Check if React build directory exists
+frontend_build_path = Path(__file__).parent.parent / "frontend" / "out"
+if frontend_build_path.exists():
     # Mount static files (_next directory contains Next.js assets)
     next_static_path = frontend_build_path / "_next"
     if next_static_path.exists():
@@ -451,10 +573,11 @@ if frontend_build_path is not None:
         else:
             raise HTTPException(status_code=404, detail="React app not built yet")
 else:
-    logger.warning("⚠️  Frontend build directory not found (checked: dist/, frontend/out/)")
+    logger.warning(f"⚠️  Frontend build directory not found at {frontend_build_path}")
     logger.warning("⚠️  React app will not be served. Build the frontend first with: cd frontend && npm run build")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    reload_enabled = os.getenv("UVICORN_RELOAD", "true").lower() in {"1", "true", "yes", "on"}
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=reload_enabled)

@@ -26,12 +26,20 @@ class PassportService:
         try:
             # Валидация ID
             if not analyte.ta_id:
+                #print("DEBUG: return False в строке 29 - валидация не прошла")
+                #return False
                 return False, "❌ ID аналита не может быть пустым"
             if not bio_layer.bre_id:
+                #print("DEBUG: return False в строке 33 - валидация не прошла")
+                #return False
                 return False, "❌ ID биослоя не может быть пустым"
             if not immobilization_layer.im_id:
+                #print("DEBUG: return False в строке 37 - валидация не прошла")
+                #return False
                 return False, "❌ ID иммобилизации не может быть пустым"
             if not memristive_layer.mem_id:
+                #print("DEBUG: return False в строке 41 - валидация не прошла")
+                #return False
                 return False, "❌ ID мемристора не может быть пустым"
             
             # Сохранение каждого слоя
@@ -75,13 +83,21 @@ class PassportService:
             
             # Обработка дубликатов и ошибок
             if duplicates:
+                #print("DEBUG: return False в строке 86 - валидация не прошла")
+                # return False
                 return False, ("DUPLICATE", duplicates)  # специальный код для UI
             if errors:
+                #print("DEBUG: return False в строке 90 - валидация не прошла")
+                #return False
                 return False, f"❌ Ошибка сохранения: {', '.join([f'{e[0]} {e[1]}' for e in errors])}"
             
             return True, "✅ Все данные успешно сохранены!"
         
         except Exception as e:
+            #import traceback
+            #traceback.print_exc()  # или logger.error(f"Ошибка: {e}", exc_info=True)
+            #print("DEBUG: return False в строке 45 - валидация не прошла")
+            #return False
             return False, f"❌ Критическая ошибка: {str(e)}"
     
     def overwrite_entity(self, entity_type: str, entity_id: str) -> bool:
@@ -115,7 +131,9 @@ class PassportService:
                 conn.commit()
             return True
         except sqlite3.Error:
-            return False
+            #print("DEBUG: return False в строке 45 - валидация не прошла")
+            return False, f"❌ Критическая ошибка"
+            #return False
     
     @staticmethod
     def _dataclass_to_db_dict(obj, prefix: str) -> dict:

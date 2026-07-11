@@ -126,8 +126,8 @@ export function emptyImmobilization(): ImmobilizationLayer {
     t_min: 4,
     t_max: 80,
     young_modulus: 10,
-    adhesion: "medium",
-    solubility: "low",
+    adhesion: "хорошая",
+    solubility: "водорастворимый",
     loss_coefficient: 0.1,
     reproducibility: 90,
     response_time: 120,
@@ -153,7 +153,7 @@ export function emptyMemristive(): MemristiveLayer {
     response_time: 30,
     stability: 90,
     lod: 5,
-    durability: 10000,
+    durability: 8760,
     power_consumption: 20,
   }
 }

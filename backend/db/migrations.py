@@ -68,7 +68,10 @@ def migration_v1_add_created_at(db_name: str) -> None:
     conn = sqlite3.connect(db_name)
     cursor = conn.cursor()
     try:
-        # если колонка уже есть – ничего не делаем
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Analytes'")
+        if not cursor.fetchone():
+            return
+
         if column_exists(conn, "Analytes", "created_at"):
             return
 

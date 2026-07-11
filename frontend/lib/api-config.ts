@@ -3,8 +3,10 @@
  * Centralizes all API endpoints and configuration
  */
 
-// API Base URL - defaults to localhost for development
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+// API Base URL - defaults to localhost for development, but respects an explicit empty string
+// so the Dockerized frontend can call the nginx same-origin /api proxy.
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL === undefined ? "http://localhost:8000" : process.env.NEXT_PUBLIC_API_URL
 
 /**
  * API Endpoints
