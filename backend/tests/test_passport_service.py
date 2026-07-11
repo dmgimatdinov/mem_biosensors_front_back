@@ -2,11 +2,31 @@
 
 from services.passport_service import PassportService
 from domain.models import Analyte, BioRecognitionLayer, ImmobilizationLayer, MemristiveLayer
-from db.manager import DatabaseManager
+from db.manager import DatabaseManager, get_connection
 
 def test_save_valid_passport():
     # service = PassportService(clean_db)
     db = DatabaseManager()
+    
+    # Очистка таблиц перед тестом
+    # Удаляем только тестовые записи по их ID
+    table_id_map = {
+        'Analytes': 'TA_ID',
+        'BioRecognitionLayers': 'BRE_ID',
+        'ImmobilizationLayers': 'IM_ID',
+        'MemristiveLayers': 'MEM_ID',
+        'SensorCombinations': 'Combo_ID',
+    }
+    
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        for table, id_col in table_id_map.items():
+            # Удаляем записи с тестовыми префиксами
+            cursor.execute(
+                f"DELETE FROM {table} WHERE {id_col} LIKE '%_TEST%' OR {id_col} LIKE '%_DUP%'"
+            )
+        conn.commit()
+    
     service = PassportService(db)
     
     # Analyte
@@ -43,7 +63,11 @@ def test_save_valid_passport():
 
 
     ok, msg = service.save_passport(analyte, bio, immob, mem)
-    assert ok == True
+    
+    print(f"\nDEBUG: ok={ok}, msg={msg}")
+    
+    # assert ok == True
+    assert ok == True, f"Ожидалось True, но получено: {msg}"
 
 def test_duplicate_detection():
     db = DatabaseManager()

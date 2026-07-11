@@ -19,21 +19,22 @@ services:
     image: mem-biosensors:latest
     container_name: mem_biosensors_app
     ports:
-      - "80:80"         # nginx → browser
+      - "80:8000"       # backend → browser
     environment:
       # ── Backend runtime environment variables ──────────────
-      DATABASE_URL: sqlite:///./memristive_biosensor.db
+      DATABASE_URL: sqlite:////app/data/memristive_biosensor.db
       LOG_LEVEL: INFO
       WORKERS: 1
+      UVICORN_RELOAD: "false"
       # Add any additional backend env vars here, e.g.:
       # SECRET_KEY: changeme
       # ALLOWED_ORIGINS: http://localhost
     volumes:
       # Persist the SQLite database between container restarts
-      - db_data:/app
+      - db_data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
