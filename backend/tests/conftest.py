@@ -36,39 +36,51 @@ from tests.factories import (
 
 
 @pytest.fixture
-def tmp_db(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
+def tmp_db() -> Generator[DatabaseManager, None, None]:
     """Create isolated temporary database for each test.
 
-    Creates a fresh SQLite database in tmp_path with all tables
+    Creates a fresh SQLite database in memory with all tables
     initialized through migrations.
-
-    Args:
-        tmp_path: pytest temporary directory
 
     Yields:
         DatabaseManager instance connected to temp database
     """
-    db_path = tmp_path / "test.db"
-    db_url = str(db_path)
+    # Use in-memory database - no file locking issues
+    db_url = ":memory:"
 
-    # Patch the database connection to use our temp database
+    # Create ONE shared connection for all operations
+    shared_connection = sqlite3.connect(db_url, check_same_thread=False)
+    shared_connection.execute("PRAGMA foreign_keys = ON")
+
+    # Patch get_connection to return the same connection
     def get_test_connection():
-        conn = sqlite3.connect(db_url)
-        conn.execute("PRAGMA foreign_keys = ON")
-        return conn
+        return shared_connection
 
-    # Create manager with temp database
-    original_get_connection = sys.modules['db.manager'].get_connection
-    sys.modules['db.manager'].get_connection = get_test_connection
+    # Patch BEFORE creating DatabaseManager
+    import db.manager
+    original_get_connection = db.manager.get_connection
+    db.manager.get_connection = get_test_connection
 
+    db_manager = None
     try:
         db_manager = DatabaseManager(db_name=db_url)
         yield db_manager
     finally:
-        # Cleanup
-        sys.modules['db.manager'].get_connection = original_get_connection
-        if db_path.exists():
-            db_path.unlink()
+        # Restore original function
+        db.manager.get_connection = original_get_connection
+        
+        # Close the shared connection
+        try:
+            shared_connection.close()
+        except Exception:
+            pass
+        
+        # Close connection in db_manager if it exists
+        if db_manager and hasattr(db_manager, 'conn'):
+            try:
+                db_manager.conn.close()
+            except Exception:
+                pass
 
 
 @pytest.fixture
