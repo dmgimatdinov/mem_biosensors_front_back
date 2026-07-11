@@ -1,7 +1,10 @@
 import { defineConfig, devices } from "@playwright/test"
 
-const baseURL = process.env.E2E_BASE_URL ?? process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:80"
-const dockerComposeFile = "/workspaces/mem_biosensors_front_back/docker-compose.yml"
+const baseURL = process.env.E2E_BASE_URL ?? process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8000"
+// следующая строка используется при ручном запуске тестов, учитавать это при работе над кодом
+const dockerComposeFile = "C:/Users/dgima/OneDrive/Документы/Projects/VSCode projects/mem_biosensors_front_back/docker-compose.yml"
+//const dockerComposeFile = "C:\\Users\\dgima\\OneDrive\\Документы\\Projects\\VSCode projects\\mem_biosensors_front_back\\docker-compose.yml"
+//"/workspaces/mem_biosensors_front_back/docker-compose.yml"
 
 export default defineConfig({
   testDir: "./tests",
@@ -33,7 +36,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `docker compose -f ${dockerComposeFile} up --build app`,
+    command: `docker compose -f "${dockerComposeFile}" up --build app`,
     url: `${baseURL}/api/health`,
     timeout: 240_000,
     reuseExistingServer: !process.env.CI,

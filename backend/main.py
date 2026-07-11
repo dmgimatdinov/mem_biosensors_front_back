@@ -1,5 +1,5 @@
 # main.py - FastAPI Backend for Memristive Biosensors
-from fastapi import FastAPI, HTTPException, status, Path as PathParam, Query
+from fastapi import FastAPI, HTTPException, status, Path as PathParam, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -9,6 +9,7 @@ import logging
 import os
 from pathlib import Path
 from io import BytesIO
+from contextlib import asynccontextmanager
 
 # Import business logic services
 from db.manager import DatabaseManager
@@ -56,11 +57,35 @@ logger = logging.getLogger(__name__)
 
 DATABASE_PATH = _resolve_database_path()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize services on startup"""
+    global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
+    
+    try:
+        db_manager = DatabaseManager(db_name=DATABASE_PATH)
+        biosensor_service = BiosensorService(db_manager)
+        passport_service = PassportService(db_manager)
+        analytics_service = AnalyticsService(db_manager)
+        export_service = ExportService(db_manager)
+        combination_service = CombinationSynthesisService(db_manager)
+        logger.info("✅ All services initialized successfully")
+    except DatabaseConnectionError as e:
+        logger.error(f"❌ Failed to connect to database: {e}")
+        raise
+
+    yield  # Приложение работает
+
+    # Cleanup при shutdown
+    logger.info("🛑 Shutting down...")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Memristive Biosensors API",
     description="API for managing memristive biosensor passports",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware for React development server
@@ -81,21 +106,21 @@ export_service = None
 combination_service = None
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
-    try:
-        db_manager = DatabaseManager(db_name=DATABASE_PATH)
-        biosensor_service = BiosensorService(db_manager)
-        passport_service = PassportService(db_manager)
-        analytics_service = AnalyticsService(db_manager)
-        export_service = ExportService(db_manager)
-        combination_service = CombinationSynthesisService(db_manager)
-        logger.info("✅ All services initialized successfully")
-    except DatabaseConnectionError as e:
-        logger.error(f"❌ Failed to connect to database: {e}")
-        raise
+# @app.on_event("startup")
+# async def startup_event():
+#     """Initialize services on startup"""
+#     global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
+#     try:
+#         db_manager = DatabaseManager(db_name=DATABASE_PATH)
+#         biosensor_service = BiosensorService(db_manager)
+#         passport_service = PassportService(db_manager)
+#         analytics_service = AnalyticsService(db_manager)
+#         export_service = ExportService(db_manager)
+#         combination_service = CombinationSynthesisService(db_manager)
+#         logger.info("✅ All services initialized successfully")
+#     except DatabaseConnectionError as e:
+#         logger.error(f"❌ Failed to connect to database: {e}")
+#         raise
 
 
 # ==================== Pydantic Models for API ====================

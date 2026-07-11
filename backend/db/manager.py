@@ -781,5 +781,11 @@ class DatabaseManager(DatabaseAdapter):
         method = exists_methods.get(entity_type)
         return method(field, value) if method else False
     
-    
+    async def close(self) -> None:
+        """Освобождает ресурсы при завершении работы."""
+        if hasattr(self, '_cache'):
+            self._cache.clear()
+        if hasattr(self, 'cache'):
+            self.cache.clear()
+        logger.info("🔒 DatabaseManager shutting down")
     
