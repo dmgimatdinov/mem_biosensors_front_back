@@ -21,9 +21,40 @@ from services.combination_synthesis import CombinationSynthesisService
 from domain.models import Analyte, BioRecognitionLayer, ImmobilizationLayer, MemristiveLayer
 from utils.logging_config import setup_logging
 
+
+def _resolve_log_level() -> int:
+    """Resolve logging level from LOG_LEVEL env var with INFO fallback."""
+    raw_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    return getattr(logging, raw_level, logging.INFO)
+
+
+def _resolve_database_path() -> str:
+    """Resolve SQLite path from DATABASE_URL (sqlite:///path.db) or fallback."""
+    db_url = os.getenv("DATABASE_URL", "").strip()
+    if db_url.startswith("sqlite:///"):
+        return db_url.replace("sqlite:///", "", 1)
+    return "memristive_biosensor.db"
+
+
+def _resolve_cors_origins() -> list[str]:
+    """Resolve CORS origins from comma-separated CORS_ORIGINS env var."""
+    raw_origins = os.getenv("CORS_ORIGINS", "").strip()
+    if raw_origins:
+        origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+        if origins:
+            return origins
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
 # Setup logging
-setup_logging(log_file="logs/biosensor.log", level=logging.INFO)
+setup_logging(log_file="logs/biosensor.log", level=_resolve_log_level())
 logger = logging.getLogger(__name__)
+
+DATABASE_PATH = _resolve_database_path()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -35,12 +66,7 @@ app = FastAPI(
 # CORS middleware for React development server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000"
-    ],
+    allow_origins=_resolve_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,7 +86,7 @@ async def startup_event():
     """Initialize services on startup"""
     global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
     try:
-        db_manager = DatabaseManager()
+        db_manager = DatabaseManager(db_name=DATABASE_PATH)
         biosensor_service = BiosensorService(db_manager)
         passport_service = PassportService(db_manager)
         analytics_service = AnalyticsService(db_manager)
