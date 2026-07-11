@@ -1,27 +1,49 @@
-# E2E tests
+# E2E Tests
 
 Playwright tests for the full browser flow against the Dockerized application running on `http://localhost:80`.
 
-## Layout
+## What is covered
 
-- `tests/test_navigation.spec.ts` checks sidebar navigation and core actions.
-- `tests/test_api_connectivity.spec.ts` checks backend reachability and API responses.
+- `tests/test_navigation.spec.ts` checks sidebar navigation and the main SPA sections.
+- `tests/test_api_connectivity.spec.ts` checks backend reachability, list endpoints, creation, and CORS.
 - `tests/test_full_flow.spec.ts` creates a passport, verifies persistence, and runs synthesis.
+
+## Requirements
+
+- Node.js 20+
+- Docker
+- Playwright 1.40+
+
+## Install
+
+```bash
+cd e2e
+npm install
+npm run install:browsers
+```
 
 ## Run
 
-1. Start the application stack so the frontend is available on port `80`.
-2. Install dependencies inside `e2e/`.
-3. Install the Chromium browser once with `npm run install:browsers`.
-4. Run `npm test`.
+`npm test` starts the Dockerized app through the Playwright web server hook, waits for port `80`, and then runs the browser tests.
 
-### Environment
+### Local commands
+
+```bash
+npm test
+npm run test:headed
+npm run test:debug
+npm run test:ui
+npm run test:chromium
+npm run test:report
+```
+
+## Environment
 
 - `E2E_BASE_URL` overrides the default `http://localhost:80` target.
 - `PLAYWRIGHT_BASE_URL` is also supported for compatibility.
 
 ## Notes
 
-- These tests do not start a local dev server.
-- They expect the frontend to proxy API requests to the running FastAPI backend.
-- The save flow uses unique IDs so repeated runs do not collide with existing data.
+- The suite uses the real nginx proxy and FastAPI backend inside Docker.
+- Test data is synthetic and uses unique IDs to avoid collisions across repeated runs.
+- The tests avoid destructive cleanup, so the container lifecycle is expected to provide isolation.

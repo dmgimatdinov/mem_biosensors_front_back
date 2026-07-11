@@ -219,10 +219,9 @@ export async function getAnalytes(limit = 50, offset = 0): Promise<Analyte[]> {
 }
 
 export async function createAnalyte(analyte: Analyte): Promise<SuccessResponse> {
-  const backendData = toBackendFormat(analyte, ANALYTE_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.analytes, {
     method: "POST",
-    body: JSON.stringify(backendData),
+    body: JSON.stringify(analyte),
   })
 }
 
@@ -235,10 +234,9 @@ export async function getBioRecognitionLayers(limit = 50, offset = 0): Promise<B
 }
 
 export async function createBioRecognitionLayer(layer: BioRecognitionLayer): Promise<SuccessResponse> {
-  const backendData = toBackendFormat(layer, BIO_RECOGNITION_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.bioRecognition, {
     method: "POST",
-    body: JSON.stringify(backendData),
+    body: JSON.stringify(layer),
   })
 }
 
@@ -251,10 +249,9 @@ export async function getImmobilizationLayers(limit = 50, offset = 0): Promise<I
 }
 
 export async function createImmobilizationLayer(layer: ImmobilizationLayer): Promise<SuccessResponse> {
-  const backendData = toBackendFormat(layer, IMMOBILIZATION_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.immobilization, {
     method: "POST",
-    body: JSON.stringify(backendData),
+    body: JSON.stringify(layer),
   })
 }
 
@@ -267,10 +264,9 @@ export async function getMemristiveLayers(limit = 50, offset = 0): Promise<Memri
 }
 
 export async function createMemristiveLayer(layer: MemristiveLayer): Promise<SuccessResponse> {
-  const backendData = toBackendFormat(layer, MEMRISTIVE_FIELD_MAP)
   return fetchApi(API_ENDPOINTS.memristive, {
     method: "POST",
-    body: JSON.stringify(backendData),
+    body: JSON.stringify(layer),
   })
 }
 
