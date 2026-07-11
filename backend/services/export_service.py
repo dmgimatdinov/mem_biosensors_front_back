@@ -50,6 +50,15 @@ class ExportService:
             payload = df.to_csv(index=False).encode('utf-8-sig')
             filename = f"{table_key}_{ts}.csv"
             return payload, filename
+        if fmt == 'excel':
+            df = pd.DataFrame(data)
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name=table_key[:31])
+            buffer.seek(0)
+            payload = buffer.read()
+            filename = f"{table_key}_{ts}.xlsx"
+            return payload, filename
         raise ValueError(f"Неподдерживаемый формат: {fmt}")
     
     def export_all(self, fmt: str = 'csv') -> tuple[bytes, str]:
@@ -79,4 +88,17 @@ class ExportService:
             buf.seek(0)
             filename = f"all_data_{ts}.zip"
             return buf.getvalue(), filename
+        if fmt == 'excel':
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                for key in TABLE_CONFIGS.keys():
+                    config = TABLE_CONFIGS[key]
+                    fetch_method = getattr(self.db, config.fetch_method.replace('_paginated', ''))
+                    df = pd.DataFrame(fetch_method())
+                    sheet_name = key[:31]
+                    df.to_excel(writer, index=False, sheet_name=sheet_name)
+            buffer.seek(0)
+            payload = buffer.read()
+            filename = f"all_data_{ts}.xlsx"
+            return payload, filename
         raise ValueError(f"Неподдерживаемый формат: {fmt}")

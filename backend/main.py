@@ -436,31 +436,6 @@ async def get_comparative_analysis():
 
 # ==================== Export Endpoints ====================
 
-@app.get("/api/export/{table_name}")
-async def export_table(
-    table_name: str = PathParam(...),
-    format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')
-):
-    """Export a specific table"""
-    try:
-        content, filename = export_service.export_table(table_name, fmt=format)
-        
-        media_types = {
-            "csv": "text/csv",
-            "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "pdf": "application/pdf"
-        }
-        
-        return StreamingResponse(
-            BytesIO(content),
-            media_type=media_types.get(format, "application/octet-stream"),
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        logger.error(f"Error exporting table: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.get("/api/export/all")
 async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
     """Export all tables"""
@@ -478,8 +453,41 @@ async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
             media_type=media_types.get(format, "application/octet-stream"),
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error(f"Error exporting all tables: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/export/{table_name}")
+async def export_table(
+    table_name: str = PathParam(...),
+    format: str = Query("csv", pattern=r'^(csv|excel|json|pdf)$')
+):
+    """Export a specific table"""
+    try:
+        content, filename = export_service.export_table(table_name, fmt=format)
+        
+        media_types = {
+            "csv": "text/csv",
+            "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "json": "application/json",
+            "pdf": "application/pdf"
+        }
+        
+        return StreamingResponse(
+            BytesIO(content),
+            media_type=media_types.get(format, "application/octet-stream"),
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except ValueError as e:
+        msg = str(e).lower()
+        if "не найдена" in msg or "not found" in msg:
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error exporting table: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
