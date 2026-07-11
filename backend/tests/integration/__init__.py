@@ -1,2 +1,1 @@
-# backend/tests/integration/__init__.py
-"""Integration tests for FastAPI endpoints."""
+"""Integration tests package for Memristive Biosensors Backend."""

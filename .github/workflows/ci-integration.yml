@@ -1,0 +1,70 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+
+      - name: Run integration tests
+        run: |
+          pytest backend/tests/integration/ \
+            -v \
+            -m integration \
+            -n auto \
+            --tb=short
+
+      - name: Run contract tests
+        run: |
+          pytest backend/tests/contract/ \
+            -v \
+            -m contract \
+            --tb=short
+
+      - name: Run security tests
+        run: |
+          pytest backend/tests/security/ \
+            -v \
+            -m security \
+            -n auto \
+            --tb=short
+
+      - name: Lint with flake8
+        run: |
+          flake8 backend/ \
+            --max-line-length=127 \
+            --max-complexity=10 \
+            --statistics \
+            --exit-zero
+
+      - name: Type check with mypy
+        run: |
+          mypy backend/ \
+            --ignore-missing-imports \
+            --no-strict-optional
+        continue-on-error: true

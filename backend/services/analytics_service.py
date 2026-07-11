@@ -9,22 +9,32 @@ class AnalyticsService:
     
     def __init__(self, db: DatabaseManager):
         self.db = db
+
+    def get_statistics(self) -> Dict[str, Any]:
+        return self.get_database_statistics()
     
     def get_database_statistics(self) -> Dict[str, Any]:
         """Получить статистику по всем таблицам."""
         stats = {}
-        
-        for key, config in TABLE_CONFIGS.items():
-            fetch_method = getattr(self.db, config.fetch_method.replace('_paginated', ''), None)
+        table_specs = [
+            ("Analytes", "list_all_analytes"),
+            ("BioRecognitionLayers", "list_all_bio_recognition_layers"),
+            ("ImmobilizationLayers", "list_all_immobilization_layers"),
+            ("MemristiveLayers", "list_all_memristive_layers"),
+            ("SensorCombinations", "list_all_sensor_combinations"),
+        ]
+
+        for table_name, method_name in table_specs:
+            fetch_method = getattr(self.db, method_name, None)
             if fetch_method:
                 try:
                     data = fetch_method()
-                    stats[key] = {
-                        'label': config.label,
+                    stats[table_name] = {
+                        'label': table_name,
                         'count': len(data) if data else 0,
                     }
                 except Exception as e:
-                    stats[key] = {'label': config.label, 'count': 0, 'error': str(e)}
+                    stats[table_name] = {'label': table_name, 'count': 0, 'error': str(e)}
         
         return stats
     

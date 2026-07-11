@@ -1,40 +1,9 @@
-# Cloudflare
-.cloudflare/
-dist/
-.wrangler/
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
-*.egg-info/
-
-# Node
-node_modules/
-.next/
-frontend/out/
-frontend/.next/
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
+# Custom
+e2e/node_modules/
+e2e/playwright-report/
+e2e/test-results/
 logs/
-
-# Testing
-.coverage
-.pytest_cache/
-
-# IDE
-.vscode/
-.idea/
+frontend/next
+frontend/my-project@0.1.0
+frontend/`-${o}`)

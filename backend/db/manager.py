@@ -14,6 +14,7 @@ DB_NAME = "memristive_biosensor.db"
 
 logger = logging.getLogger(__name__)
 
+
 def get_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.execute("PRAGMA foreign_keys = ON")
@@ -75,6 +76,12 @@ class TableConfig(Enum):
 
 class DatabaseManager(DatabaseAdapter):
     """Слой работы с БД (без Streamlit)."""
+
+    def _resolve_value(self, data: Dict[str, Any], *keys: str) -> Any:
+        for key in keys:
+            if key in data and data[key] is not None:
+                return data[key]
+        return None
 
     def __init__(self, db_name: str = DB_NAME):
         self.db_name = db_name
@@ -206,24 +213,33 @@ class DatabaseManager(DatabaseAdapter):
     def insert_analyte(self, data: Dict[str, Any]) -> bool | str:
         """Вставка или замена аналита (создаёт новое соединение для каждого вызова)."""
         try:
+            ta_id = self._resolve_value(data, 'TA_ID', 'ta_id')
+            ta_name = self._resolve_value(data, 'TA_Name', 'ta_name')
+            ph_min = self._resolve_value(data, 'PH_Min', 'ph_min')
+            ph_max = self._resolve_value(data, 'PH_Max', 'ph_max')
+            t_max = self._resolve_value(data, 'T_Max', 't_max')
+            st = self._resolve_value(data, 'ST', 'stability')
+            hl = self._resolve_value(data, 'HL', 'half_life')
+            pc = self._resolve_value(data, 'PC', 'power_consumption')
+
             with get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (data['TA_ID'],))
+                cursor.execute("SELECT TA_ID FROM Analytes WHERE TA_ID = ?", (ta_id,))
                 if cursor.fetchone():
-                    return "DUPLICATE"  # Сигнал о дубликате
+                    return "DUPLICATE"
 
                 query = """
                 INSERT OR REPLACE INTO Analytes (TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
-                    data['TA_ID'], data['TA_Name'], data.get('PH_Min'),
-                    data.get('PH_Max'), data.get('T_Max'), data.get('ST'),
-                    data.get('HL'), data.get('PC')
+                    ta_id, ta_name, ph_min,
+                    ph_max, t_max, st,
+                    hl, pc
                 ))
                 conn.commit()
                 self.clear_cache()
-                self.logger.info(f"Аналит {data['TA_ID']} успешно вставлен")
+                self.logger.info(f"Аналит {ta_id} успешно вставлен")
                 return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки аналита: {e}")
@@ -238,9 +254,25 @@ class DatabaseManager(DatabaseAdapter):
     def insert_bio_recognition_layer(self, data: Dict[str, Any]) -> bool | str:
         """Вставка или замена биораспознающего слоя (создаёт новое соединение для каждого вызова)."""
         try:
+            bre_id = self._resolve_value(data, 'BRE_ID', 'bre_id')
+            bre_name = self._resolve_value(data, 'BRE_Name', 'bre_name')
+            ph_min = self._resolve_value(data, 'PH_Min', 'ph_min')
+            ph_max = self._resolve_value(data, 'PH_Max', 'ph_max')
+            t_min = self._resolve_value(data, 'T_Min', 't_min')
+            t_max = self._resolve_value(data, 'T_Max', 't_max')
+            sn = self._resolve_value(data, 'SN', 'sensitivity')
+            dr_min = self._resolve_value(data, 'DR_Min', 'dr_min')
+            dr_max = self._resolve_value(data, 'DR_Max', 'dr_max')
+            rp = self._resolve_value(data, 'RP', 'reproducibility')
+            tr = self._resolve_value(data, 'TR', 'response_time')
+            st = self._resolve_value(data, 'ST', 'stability')
+            lod = self._resolve_value(data, 'LOD', 'lod')
+            hl = self._resolve_value(data, 'HL', 'durability')
+            pc = self._resolve_value(data, 'PC', 'power_consumption')
+
             with get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (data['BRE_ID'],))
+                cursor.execute("SELECT BRE_ID FROM BioRecognitionLayers WHERE BRE_ID = ?", (bre_id,))
                 if cursor.fetchone():
                     return "DUPLICATE"
 
@@ -250,14 +282,14 @@ class DatabaseManager(DatabaseAdapter):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
-                    data['BRE_ID'], data['BRE_Name'], data.get('PH_Min'), data.get('PH_Max'),
-                    data.get('T_Min'), data.get('T_Max'), data.get('SN'), data.get('DR_Min'),
-                    data.get('DR_Max'), data.get('RP'), data.get('TR'), data.get('ST'),
-                    data.get('LOD'), data.get('HL'), data.get('PC')
+                    bre_id, bre_name, ph_min, ph_max,
+                    t_min, t_max, sn, dr_min,
+                    dr_max, rp, tr, st,
+                    lod, hl, pc
                 ))
                 conn.commit()
                 self.clear_cache()
-                self.logger.info(f"Биослой {data['BRE_ID']} успешно вставлен")
+                self.logger.info(f"Биослой {bre_id} успешно вставлен")
                 return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки биослоя: {e}")
@@ -272,9 +304,25 @@ class DatabaseManager(DatabaseAdapter):
     def insert_immobilization_layer(self, data: Dict[str, Any]) -> bool | str:
         """Вставка или замена иммобилизационного слоя (создаёт новое соединение для каждого вызова)."""
         try:
+            im_id = self._resolve_value(data, 'IM_ID', 'im_id')
+            im_name = self._resolve_value(data, 'IM_Name', 'im_name')
+            ph_min = self._resolve_value(data, 'PH_Min', 'ph_min')
+            ph_max = self._resolve_value(data, 'PH_Max', 'ph_max')
+            t_min = self._resolve_value(data, 'T_Min', 't_min')
+            t_max = self._resolve_value(data, 'T_Max', 't_max')
+            mp = self._resolve_value(data, 'MP', 'young_modulus')
+            adh = self._resolve_value(data, 'Adh', 'adhesion')
+            sol = self._resolve_value(data, 'Sol', 'solubility')
+            k_im = self._resolve_value(data, 'K_IM', 'loss_coefficient')
+            rp = self._resolve_value(data, 'RP', 'reproducibility')
+            tr = self._resolve_value(data, 'TR', 'response_time')
+            st = self._resolve_value(data, 'ST', 'stability')
+            hl = self._resolve_value(data, 'HL', 'durability')
+            pc = self._resolve_value(data, 'PC', 'power_consumption')
+
             with get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (data['IM_ID'],))
+                cursor.execute("SELECT IM_ID FROM ImmobilizationLayers WHERE IM_ID = ?", (im_id,))
                 if cursor.fetchone():
                     return "DUPLICATE"
 
@@ -284,14 +332,14 @@ class DatabaseManager(DatabaseAdapter):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
-                    data['IM_ID'], data['IM_Name'], data.get('PH_Min'), data.get('PH_Max'),
-                    data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('Adh'),
-                    data.get('Sol'), data.get('K_IM'), data.get('RP'), data.get('TR'),
-                    data.get('ST'), data.get('HL'), data.get('PC')
+                    im_id, im_name, ph_min, ph_max,
+                    t_min, t_max, mp, adh,
+                    sol, k_im, rp, tr,
+                    st, hl, pc
                 ))
                 conn.commit()
                 self.clear_cache()
-                self.logger.info(f"Иммобилизационный слой {data['IM_ID']} успешно вставлен")
+                self.logger.info(f"Иммобилизационный слой {im_id} успешно вставлен")
                 return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки иммобилизационного слоя: {e}")
@@ -306,9 +354,26 @@ class DatabaseManager(DatabaseAdapter):
     def insert_memristive_layer(self, data: Dict[str, Any]) -> bool | str:
         """Вставка или замена мемристивного слоя (создаёт новое соединение для каждого вызова)."""
         try:
+            mem_id = self._resolve_value(data, 'MEM_ID', 'mem_id')
+            mem_name = self._resolve_value(data, 'MEM_Name', 'mem_name')
+            ph_min = self._resolve_value(data, 'PH_Min', 'ph_min')
+            ph_max = self._resolve_value(data, 'PH_Max', 'ph_max')
+            t_min = self._resolve_value(data, 'T_Min', 't_min')
+            t_max = self._resolve_value(data, 'T_Max', 't_max')
+            mp = self._resolve_value(data, 'MP', 'young_modulus')
+            sn = self._resolve_value(data, 'SN', 'sensitivity')
+            dr_min = self._resolve_value(data, 'DR_Min', 'dr_min')
+            dr_max = self._resolve_value(data, 'DR_Max', 'dr_max')
+            rp = self._resolve_value(data, 'RP', 'reproducibility')
+            tr = self._resolve_value(data, 'TR', 'response_time')
+            st = self._resolve_value(data, 'ST', 'stability')
+            lod = self._resolve_value(data, 'LOD', 'lod')
+            hl = self._resolve_value(data, 'HL', 'durability')
+            pc = self._resolve_value(data, 'PC', 'power_consumption')
+
             with get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (data['MEM_ID'],))
+                cursor.execute("SELECT MEM_ID FROM MemristiveLayers WHERE MEM_ID = ?", (mem_id,))
                 if cursor.fetchone():
                     return "DUPLICATE"
 
@@ -318,14 +383,14 @@ class DatabaseManager(DatabaseAdapter):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
-                    data['MEM_ID'], data['MEM_Name'], data.get('PH_Min'), data.get('PH_Max'),
-                    data.get('T_Min'), data.get('T_Max'), data.get('MP'), data.get('SN'),
-                    data.get('DR_Min'), data.get('DR_Max'), data.get('RP'), data.get('TR'),
-                    data.get('ST'), data.get('LOD'), data.get('HL'), data.get('PC')
+                    mem_id, mem_name, ph_min, ph_max,
+                    t_min, t_max, mp, sn,
+                    dr_min, dr_max, rp, tr,
+                    st, lod, hl, pc
                 ))
                 conn.commit()
                 self.clear_cache()
-                self.logger.info(f"Мемристивный слой {data['MEM_ID']} успешно вставлен")
+                self.logger.info(f"Мемристивный слой {mem_id} успешно вставлен")
                 return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки мемристивного слоя: {e}")
@@ -341,9 +406,25 @@ class DatabaseManager(DatabaseAdapter):
     def insert_sensor_combination(self, data: Dict[str, Any]) -> bool | str:
         """Вставка или замена комбинации сенсора (создаёт новое соединение для каждого вызова)."""
         try:
+            combo_id = self._resolve_value(data, 'Combo_ID', 'combo_id')
+            ta_id = self._resolve_value(data, 'TA_ID', 'ta_id')
+            bre_id = self._resolve_value(data, 'BRE_ID', 'bre_id')
+            im_id = self._resolve_value(data, 'IM_ID', 'im_id')
+            mem_id = self._resolve_value(data, 'MEM_ID', 'mem_id')
+            sn_total = self._resolve_value(data, 'SN_total', 'sn_total')
+            tr_total = self._resolve_value(data, 'TR_total', 'tr_total')
+            st_total = self._resolve_value(data, 'ST_total', 'st_total')
+            rp_total = self._resolve_value(data, 'RP_total', 'rp_total')
+            lod_total = self._resolve_value(data, 'LOD_total', 'lod_total')
+            dr_total = self._resolve_value(data, 'DR_total', 'dr_total')
+            hl_total = self._resolve_value(data, 'HL_total', 'hl_total')
+            pc_total = self._resolve_value(data, 'PC_total', 'pc_total')
+            score = self._resolve_value(data, 'Score', 'score')
+            created_at = self._resolve_value(data, 'created_at')
+
             with get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (data['Combo_ID'],))
+                cursor.execute("SELECT Combo_ID FROM SensorCombinations WHERE Combo_ID = ?", (combo_id,))
                 if cursor.fetchone():
                     return "DUPLICATE"
 
@@ -353,14 +434,14 @@ class DatabaseManager(DatabaseAdapter):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
-                    data['Combo_ID'], data.get('TA_ID'), data.get('BRE_ID'), data.get('IM_ID'),
-                    data.get('MEM_ID'), data.get('SN_total'), data.get('TR_total'), data.get('ST_total'),
-                    data.get('RP_total'), data.get('LOD_total'), data.get('DR_total'), data.get('HL_total'),
-                    data.get('PC_total'), data.get('Score'), data.get('created_at')
+                    combo_id, ta_id, bre_id, im_id,
+                    mem_id, sn_total, tr_total, st_total,
+                    rp_total, lod_total, dr_total, hl_total,
+                    pc_total, score, created_at
                 ))
                 conn.commit()
                 self.clear_cache()
-                self.logger.info(f"Комбинация сенсора {data['Combo_ID']} успешно вставлена")
+                self.logger.info(f"Комбинация сенсора {combo_id} успешно вставлена")
                 return True
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка вставки комбинации сенсора: {e}")
@@ -472,6 +553,18 @@ class DatabaseManager(DatabaseAdapter):
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка получения комбинаций сенсоров: {e}")
             return []
+
+    def insert_bio_recognition(self, data: Dict[str, Any]) -> bool | str:
+        return self.insert_bio_recognition_layer(data)
+
+    def insert_immobilization(self, data: Dict[str, Any]) -> bool | str:
+        return self.insert_immobilization_layer(data)
+
+    def insert_memristive(self, data: Dict[str, Any]) -> bool | str:
+        return self.insert_memristive_layer(data)
+
+    def get_combinations(self) -> List[Dict[str, Any]]:
+        return self.list_all_sensor_combinations()
    
     def _fetch_paginated(
         self, 
@@ -719,5 +812,11 @@ class DatabaseManager(DatabaseAdapter):
         method = exists_methods.get(entity_type)
         return method(field, value) if method else False
     
-    
+    async def close(self) -> None:
+        """Освобождает ресурсы при завершении работы."""
+        if hasattr(self, '_cache'):
+            self._cache.clear()
+        if hasattr(self, 'cache'):
+            self.cache.clear()
+        logger.info("🔒 DatabaseManager shutting down")
     
