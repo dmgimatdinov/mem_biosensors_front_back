@@ -165,15 +165,36 @@ async def health_check():
 
 @app.get("/api/analytes", response_model=List[Dict[str, Any]])
 async def get_analytes(
+    search: str | None = Query(None, min_length=1),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0)
 ):
     """Get all analytes"""
     try:
         analytes = biosensor_service.get_all_entities("analyte", limit=limit, offset=offset)
+        if search:
+            analytes = [
+                item for item in analytes
+                if search.lower() in item.get("TA_Name", "").lower()
+            ]
         return analytes
     except Exception as e:
         logger.error(f"Error fetching analytes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytes/{ta_id}", response_model=Dict[str, Any])
+async def get_analyte_by_id(ta_id: str):
+    """Get a single analyte by ID"""
+    try:
+        analyte = db_manager.get_analyte_by_id(ta_id)
+        if analyte is None:
+            raise HTTPException(status_code=404, detail="Analyte not found")
+        return analyte
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching analyte by id {ta_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -185,6 +206,8 @@ async def create_analyte(analyte: AnalyteCreate):
         success, message = biosensor_service.save_entity("analyte", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
@@ -210,6 +233,21 @@ async def get_bio_recognition(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/bio-recognition/{bre_id}", response_model=Dict[str, Any])
+async def get_bio_recognition_by_id(bre_id: str):
+    """Get a single bio recognition layer by ID"""
+    try:
+        bio_layer = db_manager.get_bio_recognition_layer_by_id(bre_id)
+        if bio_layer is None:
+            raise HTTPException(status_code=404, detail="Bio recognition layer not found")
+        return bio_layer
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching bio recognition layer by id {bre_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/bio-recognition", response_model=SuccessResponse)
 async def create_bio_recognition(layer: BioRecognitionCreate):
     """Create a new bio recognition layer"""
@@ -218,6 +256,8 @@ async def create_bio_recognition(layer: BioRecognitionCreate):
         success, message = biosensor_service.save_entity("bio_recognition", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
@@ -243,6 +283,21 @@ async def get_immobilization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/immobilization/{im_id}", response_model=Dict[str, Any])
+async def get_immobilization_by_id(im_id: str):
+    """Get a single immobilization layer by ID"""
+    try:
+        imm_layer = db_manager.get_immobilization_layer_by_id(im_id)
+        if imm_layer is None:
+            raise HTTPException(status_code=404, detail="Immobilization layer not found")
+        return imm_layer
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching immobilization layer by id {im_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/immobilization", response_model=SuccessResponse)
 async def create_immobilization(layer: ImmobilizationCreate):
     """Create a new immobilization layer"""
@@ -251,6 +306,8 @@ async def create_immobilization(layer: ImmobilizationCreate):
         success, message = biosensor_service.save_entity("immobilization", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
@@ -276,6 +333,21 @@ async def get_memristive(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/memristive/{mem_id}", response_model=Dict[str, Any])
+async def get_memristive_by_id(mem_id: str):
+    """Get a single memristive layer by ID"""
+    try:
+        mem_layer = db_manager.get_memristive_layer_by_id(mem_id)
+        if mem_layer is None:
+            raise HTTPException(status_code=404, detail="Memristive layer not found")
+        return mem_layer
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching memristive layer by id {mem_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/memristive", response_model=SuccessResponse)
 async def create_memristive(layer: MemristiveCreate):
     """Create a new memristive layer"""
@@ -284,6 +356,8 @@ async def create_memristive(layer: MemristiveCreate):
         success, message = biosensor_service.save_entity("memristive", data)
         if success:
             return SuccessResponse(success=True, message=message)
+        elif "уже существует" in message.lower() or "already exists" in message.lower():
+            raise HTTPException(status_code=409, detail=message)
         else:
             raise HTTPException(status_code=400, detail=message)
     except HTTPException:
