@@ -75,7 +75,7 @@ def tmp_db(tmp_path: Path) -> Generator[DatabaseManager, None, None]:
 def api_client(tmp_db: DatabaseManager) -> Generator[TestClient, None, None]:
     """Create FastAPI test client with isolated database.
 
-    Patches the global database manager in main.py to use the test database.
+    Patches the global database manager and services in main.py to use the test database.
 
     Args:
         tmp_db: Temporary database fixture
@@ -83,17 +83,71 @@ def api_client(tmp_db: DatabaseManager) -> Generator[TestClient, None, None]:
     Yields:
         TestClient configured with test database
     """
-    # Replace the global db_manager in main.py
     import main
     original_db_manager = main.db_manager
-    main.db_manager = tmp_db
+    original_biosensor_service = main.biosensor_service
+    original_passport_service = main.passport_service
+    original_analytics_service = main.analytics_service
+    original_export_service = main.export_service
+    original_combination_service = main.combination_service
+    original_startup = list(main.app.router.on_startup)
 
-    try:
-        client = TestClient(app)
+    main.app.router.on_startup.clear()
+    main.db_manager = tmp_db
+    main.biosensor_service = main.BiosensorService(tmp_db)
+    main.passport_service = main.PassportService(tmp_db)
+    main.analytics_service = main.AnalyticsService(tmp_db)
+    main.export_service = main.ExportService(tmp_db)
+    main.combination_service = main.CombinationSynthesisService(tmp_db)
+
+    with TestClient(app) as client:
         yield client
-    finally:
-        # Restore original
-        main.db_manager = original_db_manager
+
+    main.app.router.on_startup.extend(original_startup)
+    main.db_manager = original_db_manager
+    main.biosensor_service = original_biosensor_service
+    main.passport_service = original_passport_service
+    main.analytics_service = original_analytics_service
+    main.export_service = original_export_service
+    main.combination_service = original_combination_service
+
+
+@pytest.fixture(params=[
+    ("analytes", "analyte"),
+    ("bio-recognition", "bio_recognition"),
+    ("immobilization", "immobilization"),
+    ("memristive", "memristive"),
+])
+def entity_mapping(request):
+    """Параметризованная фикстура для сопоставления endpoint и типа сущности."""
+    return {
+        "endpoint": f"/api/{request.param[0]}",
+        "entity_type": request.param[1],
+    }
+
+
+@pytest.fixture
+def entity_endpoint(entity_mapping):
+    """Параметризованная фикстура для всех эндпоинтов сущностей."""
+    return entity_mapping["endpoint"]
+
+
+@pytest.fixture
+def entity_type(entity_mapping):
+    """Параметризованная фикстура для типов сущностей."""
+    return entity_mapping["entity_type"]
+
+
+@pytest.fixture
+def entity_factory(entity_type):
+    """Возвращает фабрику для нужного типа сущности."""
+    factories = {
+        "analyte": make_analyte,
+        "bio_recognition": make_bio_recognition_layer,
+        "immobilization": make_immobilization_layer,
+        "memristive": make_memristive_layer
+    }
+    return factories[entity_type]
 
 
 @pytest.fixture
