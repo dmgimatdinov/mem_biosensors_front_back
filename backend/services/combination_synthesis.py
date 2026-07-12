@@ -33,10 +33,10 @@ class CombinationSynthesisService:
         Returns:
             (total_checked, successfully_created)
         """
-        analytes = self.db.list_all_analytes()
-        bio_layers = self.db.list_all_bio_recognition_layers()
-        immob_layers = self.db.list_all_immobilization_layers()
-        mem_layers = self.db.list_all_memristive_layers()
+        analytes = [record for record in self.db.list_all_analytes() if not self._is_test_record(record)]
+        bio_layers = [record for record in self.db.list_all_bio_recognition_layers() if not self._is_test_record(record)]
+        immob_layers = [record for record in self.db.list_all_immobilization_layers() if not self._is_test_record(record)]
+        mem_layers = [record for record in self.db.list_all_memristive_layers() if not self._is_test_record(record)]
         
         total_possible = len(analytes) * len(bio_layers) * len(immob_layers) * len(mem_layers)
         
@@ -84,6 +84,13 @@ class CombinationSynthesisService:
         Returns:
             True если комбинация создана, False иначе
         """
+        if any(
+            self._is_test_record(record)
+            for record in (analyte, bio_layer, immob_layer, mem_layer)
+        ):
+            logger.debug("Пропускаем комбинацию с тестовым элементом")
+            return False
+
         analyte = self._normalize_record(analyte, "analyte")
         bio_layer = self._normalize_record(bio_layer, "bio")
         immob_layer = self._normalize_record(immob_layer, "immob")
@@ -158,6 +165,13 @@ class CombinationSynthesisService:
         application_profile: str = "PoC",
     ) -> bool:
         """Создание комбинации через новый CompatibilityEngineV2."""
+        if any(
+            self._is_test_record(record)
+            for record in (analyte, bio_layer, immob_layer, mem_layer)
+        ):
+            logger.debug("Пропускаем комбинацию v2 с тестовым элементом")
+            return False
+
         analyte = self._normalize_record(analyte, "analyte")
         bio_layer = self._normalize_record(bio_layer, "bio")
         immob_layer = self._normalize_record(immob_layer, "immob")
@@ -233,10 +247,10 @@ class CombinationSynthesisService:
         application_profile: str = "PoC",
     ) -> Dict[str, int]:
         """Синтез комбинаций через CompatibilityEngineV2."""
-        analytes = self.db.list_all_analytes()
-        bio_layers = self.db.list_all_bio_recognition_layers()
-        immob_layers = self.db.list_all_immobilization_layers()
-        mem_layers = self.db.list_all_memristive_layers()
+        analytes = [record for record in self.db.list_all_analytes() if not self._is_test_record(record)]
+        bio_layers = [record for record in self.db.list_all_bio_recognition_layers() if not self._is_test_record(record)]
+        immob_layers = [record for record in self.db.list_all_immobilization_layers() if not self._is_test_record(record)]
+        mem_layers = [record for record in self.db.list_all_memristive_layers() if not self._is_test_record(record)]
 
         total_checked = 0
         successfully_created = 0
@@ -263,6 +277,20 @@ class CombinationSynthesisService:
 
         return {"checked": total_checked, "created": successfully_created}
     
+    @staticmethod
+    def _is_test_record(record: Dict[str, Any]) -> bool:
+        if not record:
+            return False
+        if isinstance(record.get("is_test"), (int, float)):
+            return int(record["is_test"]) == 1
+        if isinstance(record.get("is_test"), str):
+            return record["is_test"].strip().lower() in {"1", "true", "yes", "y"}
+
+        record_id = str(record.get("TA_ID") or record.get("ta_id") or record.get("BRE_ID") or record.get("bre_id") or record.get("IM_ID") or record.get("im_id") or record.get("MEM_ID") or record.get("mem_id") or "")
+        if not record_id:
+            return False
+        return record_id.endswith("_TEST") or record_id.endswith("_DUP")
+
     @staticmethod
     def _normalize_record(record: Dict[str, Any], kind: str) -> Dict[str, Any]:
         normalized = dict(record)
