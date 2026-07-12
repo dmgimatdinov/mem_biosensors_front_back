@@ -216,6 +216,42 @@ class DatabaseManager(DatabaseAdapter):
                 FOREIGN KEY (IM_ID) REFERENCES ImmobilizationLayers (IM_ID),
                 FOREIGN KEY (MEM_ID) REFERENCES MemristiveLayers (MEM_ID)
             );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS AuthUsers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(128) UNIQUE NOT NULL,
+                password_hash VARCHAR(512) NOT NULL,
+                role VARCHAR(64) NOT NULL,
+                is_active INTEGER DEFAULT 1,
+                is_service_account INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP DEFAULT NULL
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS AuthRefreshTokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash VARCHAR(128) UNIQUE NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                revoked INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES AuthUsers (id)
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS AuthApiKeys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                key_prefix VARCHAR(32) NOT NULL,
+                key_hash VARCHAR(128) UNIQUE NOT NULL,
+                revoked INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_used_at TIMESTAMP DEFAULT NULL,
+                FOREIGN KEY (user_id) REFERENCES AuthUsers (id)
+            );
             """
         ]
         try:

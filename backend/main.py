@@ -1,5 +1,5 @@
 # main.py - FastAPI Backend for Memristive Biosensors
-from fastapi import FastAPI, HTTPException, status, Path as PathParam, Query, Request
+from fastapi import FastAPI, HTTPException, status, Path as PathParam, Query, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -14,6 +14,10 @@ from contextlib import asynccontextmanager
 # Import business logic services
 from db.manager import DatabaseManager
 from db.exceptions import DatabaseConnectionError, DatabaseIntegrityError
+from auth.dependencies import get_auth_service, require_role, require_synthesis_limit
+from auth.middleware import AuthContextMiddleware
+from auth.rbac import ROLE_DESIGNER, ROLE_KB_ADMIN
+from auth.service import AuthService, Principal
 from services.biosensor_service import BiosensorService
 from services.passport_service import PassportService
 from services.analytics_service import AnalyticsService
@@ -60,7 +64,7 @@ DATABASE_PATH = _resolve_database_path()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize services on startup"""
-    global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service
+    global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service, auth_service
     
     try:
         db_manager = DatabaseManager(db_name=DATABASE_PATH)
@@ -69,6 +73,9 @@ async def lifespan(app: FastAPI):
         analytics_service = AnalyticsService(db_manager)
         export_service = ExportService(db_manager)
         combination_service = CombinationSynthesisService(db_manager)
+        auth_service = AuthService()
+        auth_service.ensure_bootstrap_users()
+        app.state.auth_service = auth_service
         logger.info("✅ All services initialized successfully")
     except DatabaseConnectionError as e:
         logger.error(f"❌ Failed to connect to database: {e}")
@@ -98,6 +105,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthContextMiddleware)
 
 # Initialize database and services
 db_manager = None
@@ -106,6 +114,7 @@ passport_service = None
 analytics_service = None
 export_service = None
 combination_service = None
+auth_service = None
 
 
 # @app.on_event("startup")
@@ -206,12 +215,106 @@ class SuccessResponse(BaseModel):
     data: Optional[Any] = None
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    role: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
+class ApiKeyGenerateRequest(BaseModel):
+    username: str
+    name: str
+
+
 # ==================== API Endpoints ====================
 
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "ok", "message": "API is running"}
+
+
+# ==================== Auth Endpoints ====================
+
+@app.post("/api/auth/login")
+async def auth_login(payload: LoginRequest, auth: AuthService = Depends(get_auth_service)):
+    tokens = auth.login(payload.username, payload.password)
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+    }
+
+
+@app.post("/api/auth/register")
+async def auth_register(
+    payload: RegisterRequest,
+    principal: Principal = Depends(require_role(ROLE_KB_ADMIN)),
+    auth: AuthService = Depends(get_auth_service),
+):
+    _ = principal
+    user = auth.register_user(payload.username, payload.password, payload.role)
+    return {"success": True, "data": user}
+
+
+@app.post("/api/auth/refresh")
+async def auth_refresh(payload: RefreshRequest, auth: AuthService = Depends(get_auth_service)):
+    tokens = auth.refresh(payload.refresh_token)
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+    }
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(payload: LogoutRequest, auth: AuthService = Depends(get_auth_service)):
+    auth.logout(payload.refresh_token)
+    return {"success": True}
+
+
+# ==================== API Keys Endpoints ====================
+
+@app.post("/api/api-keys/generate")
+async def generate_api_key(
+    payload: ApiKeyGenerateRequest,
+    principal: Principal = Depends(require_role(ROLE_KB_ADMIN)),
+    auth: AuthService = Depends(get_auth_service),
+):
+    _ = principal
+    return auth.generate_api_key(payload.username, payload.name)
+
+
+@app.get("/api/api-keys")
+async def list_api_keys(
+    username: Optional[str] = Query(None),
+    principal: Principal = Depends(require_role(ROLE_KB_ADMIN)),
+    auth: AuthService = Depends(get_auth_service),
+):
+    _ = principal
+    return auth.list_api_keys(username=username)
+
+
+@app.delete("/api/api-keys/{key_id}")
+async def revoke_api_key(
+    key_id: int,
+    principal: Principal = Depends(require_role(ROLE_KB_ADMIN)),
+    auth: AuthService = Depends(get_auth_service),
+):
+    _ = principal
+    auth.revoke_api_key(key_id)
+    return {"success": True}
 
 
 # ==================== Analytes Endpoints ====================
@@ -436,7 +539,10 @@ async def get_combinations(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/combinations/synthesize")
+@app.post(
+    "/api/combinations/synthesize",
+    dependencies=[Depends(require_role(ROLE_DESIGNER)), Depends(require_synthesis_limit)],
+)
 async def synthesize_combinations(max_combinations: int = Query(10000, ge=1, le=50000)):
     """Synthesize new sensor combinations"""
     try:
@@ -452,7 +558,10 @@ async def synthesize_combinations(max_combinations: int = Query(10000, ge=1, le=
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/combinations/synthesize-v2")
+@app.post(
+    "/api/combinations/synthesize-v2",
+    dependencies=[Depends(require_role(ROLE_DESIGNER)), Depends(require_synthesis_limit)],
+)
 async def synthesize_combinations_v2(
     application_profile: str = Query("PoC", pattern=r"^(PoC|LoC|Clinical_Diagnostics)$"),
     max_combinations: int = Query(10000, ge=1, le=50000),
@@ -479,7 +588,7 @@ async def synthesize_combinations_v2(
 
 # ==================== Analytics Endpoints ====================
 
-@app.get("/api/analytics/statistics")
+@app.get("/api/analytics/statistics", dependencies=[Depends(require_role(ROLE_DESIGNER))])
 async def get_statistics():
     """Get database statistics"""
     try:
@@ -490,7 +599,7 @@ async def get_statistics():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/analytics/best-combinations")
+@app.get("/api/analytics/best-combinations", dependencies=[Depends(require_role(ROLE_DESIGNER))])
 async def get_best_combinations(limit: int = Query(10, ge=1, le=100)):
     """Get best sensor combinations"""
     try:
@@ -501,7 +610,7 @@ async def get_best_combinations(limit: int = Query(10, ge=1, le=100)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/analytics/comparative")
+@app.get("/api/analytics/comparative", dependencies=[Depends(require_role(ROLE_DESIGNER))])
 async def get_comparative_analysis():
     """Get comparative analysis of layers"""
     try:
@@ -514,7 +623,7 @@ async def get_comparative_analysis():
 
 # ==================== Export Endpoints ====================
 
-@app.get("/api/export/all")
+@app.get("/api/export/all", dependencies=[Depends(require_role(ROLE_DESIGNER))])
 async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
     """Export all tables"""
     try:
@@ -538,7 +647,7 @@ async def export_all(format: str = Query("csv", pattern=r'^(csv|excel|pdf)$')):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/export/{table_name}")
+@app.get("/api/export/{table_name}", dependencies=[Depends(require_role(ROLE_DESIGNER))])
 async def export_table(
     table_name: str = PathParam(...),
     format: str = Query("csv", pattern=r'^(csv|excel|json|pdf)$')

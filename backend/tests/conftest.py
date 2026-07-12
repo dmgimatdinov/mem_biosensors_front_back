@@ -19,6 +19,9 @@ from fastapi.testclient import TestClient
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Default auth mode for legacy tests.
+os.environ.setdefault("AUTH_MODE", "disabled")
+
 from main import app
 from db.manager import DatabaseManager, get_connection
 from db.migrations import MigrationManager, ALL_MIGRATIONS
@@ -33,6 +36,27 @@ from tests.factories import (
     ImmobilizationLayerFactory,
     MemristiveLayerFactory,
 )
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--auth-mode",
+        action="store",
+        default=None,
+        help="Auth mode for tests: disabled|jwt",
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def configure_auth_mode(request):
+    cli_mode = request.config.getoption("--auth-mode")
+    if cli_mode:
+        os.environ["AUTH_MODE"] = cli_mode
+    os.environ.setdefault("AUTH_MODE", "disabled")
+
+    import settings
+    settings.AUTH_MODE = os.environ["AUTH_MODE"]
+    yield
 
 
 @pytest.fixture
