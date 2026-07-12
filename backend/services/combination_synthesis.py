@@ -2,7 +2,12 @@
 
 from db.manager import DatabaseManager, TableConfig
 from domain.validators import CombinationValidator
-from domain.metrics import MetricsNormalizer
+from domain.metrics import (
+    MetricsNormalizer,
+    calculate_final_score,
+    calculate_reliability_coefficient,
+    infer_reliability_inputs,
+)
 from domain.models import SensorCombination
 from typing import List, Dict, Any, Tuple
 import logging
@@ -92,8 +97,17 @@ class CombinationSynthesisService:
         # Расчёт интегральных метрик
         metrics = self._calculate_metrics(analyte, bio_layer, immob_layer, mem_layer)
         
-        # Расчёт Score
-        score = self._calculate_score(metrics)
+        # Расчёт базового Score
+        raw_score = self._calculate_score(metrics)
+        eta, alpha, gamma = infer_reliability_inputs({
+            'analyte': analyte,
+            'bio_layer': bio_layer,
+            'immobilization_layer': immob_layer,
+            'memristive_layer': mem_layer,
+            **metrics,
+        })
+        kappa = calculate_reliability_coefficient(eta=eta, alpha=alpha, gamma=gamma)
+        score = max(0.0, min(10.0, calculate_final_score(raw_score, kappa)))
         
         # ID комбинации
         combo_id = f"COMBO_{analyte.get('TA_ID', analyte.get('ta_id'))}_{bio_layer.get('BRE_ID', bio_layer.get('bre_id'))}_{immob_layer.get('IM_ID', immob_layer.get('im_id'))}_{mem_layer.get('MEM_ID', mem_layer.get('mem_id'))}"
@@ -120,7 +134,10 @@ class CombinationSynthesisService:
         result = self.db.insert_sensor_combination(combination_data)
         
         if result is True:
-            logger.info(f"✅ Комбинация {combo_id} создана (Score: {score:.3f})")
+            logger.info(
+                f"✅ Комбинация {combo_id} создана "
+                f"(raw={raw_score:.3f}, kappa={kappa:.3f}, score={score:.3f})"
+            )
             return True
         elif result == "DUPLICATE":
             logger.debug(f"⚠️ Комбинация {combo_id} уже существует")

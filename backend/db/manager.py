@@ -110,7 +110,12 @@ class DatabaseManager(DatabaseAdapter):
                 ST REAL,
                 HL REAL,
                 PC REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                source_type TEXT DEFAULT 'expert' CHECK (source_type IS NULL OR source_type IN ('experimental','manufacturer','expert','literature')),
+                source_doi VARCHAR(255) DEFAULT NULL,
+                source_date DATE DEFAULT NULL,
+                reliability_category TEXT DEFAULT 'medium' CHECK (reliability_category IS NULL OR reliability_category IN ('high','medium','low')),
+                data_completeness REAL DEFAULT 1.0 CHECK (data_completeness IS NULL OR (data_completeness >= 0.0 AND data_completeness <= 1.0))
             );
             """,
             """
@@ -130,7 +135,12 @@ class DatabaseManager(DatabaseAdapter):
                 LOD REAL,
                 HL REAL,
                 PC REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                source_type TEXT DEFAULT 'expert' CHECK (source_type IS NULL OR source_type IN ('experimental','manufacturer','expert','literature')),
+                source_doi VARCHAR(255) DEFAULT NULL,
+                source_date DATE DEFAULT NULL,
+                reliability_category TEXT DEFAULT 'medium' CHECK (reliability_category IS NULL OR reliability_category IN ('high','medium','low')),
+                data_completeness REAL DEFAULT 1.0 CHECK (data_completeness IS NULL OR (data_completeness >= 0.0 AND data_completeness <= 1.0))
             );
             """,
             """
@@ -150,7 +160,12 @@ class DatabaseManager(DatabaseAdapter):
                 ST REAL,
                 HL REAL,
                 PC REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                source_type TEXT DEFAULT 'expert' CHECK (source_type IS NULL OR source_type IN ('experimental','manufacturer','expert','literature')),
+                source_doi VARCHAR(255) DEFAULT NULL,
+                source_date DATE DEFAULT NULL,
+                reliability_category TEXT DEFAULT 'medium' CHECK (reliability_category IS NULL OR reliability_category IN ('high','medium','low')),
+                data_completeness REAL DEFAULT 1.0 CHECK (data_completeness IS NULL OR (data_completeness >= 0.0 AND data_completeness <= 1.0))
             );
             """,
             """
@@ -171,7 +186,12 @@ class DatabaseManager(DatabaseAdapter):
                 LOD REAL,
                 HL REAL,
                 PC REAL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                source_type TEXT DEFAULT 'expert' CHECK (source_type IS NULL OR source_type IN ('experimental','manufacturer','expert','literature')),
+                source_doi VARCHAR(255) DEFAULT NULL,
+                source_date DATE DEFAULT NULL,
+                reliability_category TEXT DEFAULT 'medium' CHECK (reliability_category IS NULL OR reliability_category IN ('high','medium','low')),
+                data_completeness REAL DEFAULT 1.0 CHECK (data_completeness IS NULL OR (data_completeness >= 0.0 AND data_completeness <= 1.0))
             );
             """,
             """
@@ -221,6 +241,11 @@ class DatabaseManager(DatabaseAdapter):
             st = self._resolve_value(data, 'ST', 'stability')
             hl = self._resolve_value(data, 'HL', 'half_life')
             pc = self._resolve_value(data, 'PC', 'power_consumption')
+            source_type = self._resolve_value(data, 'source_type')
+            source_doi = self._resolve_value(data, 'source_doi')
+            source_date = self._resolve_value(data, 'source_date')
+            reliability_category = self._resolve_value(data, 'reliability_category')
+            data_completeness = self._resolve_value(data, 'data_completeness')
 
             with get_connection() as conn:
                 cursor = conn.cursor()
@@ -229,13 +254,17 @@ class DatabaseManager(DatabaseAdapter):
                     return "DUPLICATE"
 
                 query = """
-                INSERT OR REPLACE INTO Analytes (TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO Analytes (
+                    TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
                     ta_id, ta_name, ph_min,
                     ph_max, t_max, st,
-                    hl, pc
+                    hl, pc,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
                 ))
                 conn.commit()
                 self.clear_cache()
@@ -269,6 +298,11 @@ class DatabaseManager(DatabaseAdapter):
             lod = self._resolve_value(data, 'LOD', 'lod')
             hl = self._resolve_value(data, 'HL', 'durability')
             pc = self._resolve_value(data, 'PC', 'power_consumption')
+            source_type = self._resolve_value(data, 'source_type')
+            source_doi = self._resolve_value(data, 'source_doi')
+            source_date = self._resolve_value(data, 'source_date')
+            reliability_category = self._resolve_value(data, 'reliability_category')
+            data_completeness = self._resolve_value(data, 'data_completeness')
 
             with get_connection() as conn:
                 cursor = conn.cursor()
@@ -278,14 +312,19 @@ class DatabaseManager(DatabaseAdapter):
 
                 query = """
                 INSERT OR REPLACE INTO BioRecognitionLayers 
-                (BRE_ID, BRE_Name, PH_Min, PH_Max, T_Min, T_Max, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (
+                    BRE_ID, BRE_Name, PH_Min, PH_Max, T_Min, T_Max, SN, DR_Min, DR_Max,
+                    RP, TR, ST, LOD, HL, PC,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
                     bre_id, bre_name, ph_min, ph_max,
                     t_min, t_max, sn, dr_min,
                     dr_max, rp, tr, st,
-                    lod, hl, pc
+                    lod, hl, pc,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
                 ))
                 conn.commit()
                 self.clear_cache()
@@ -319,6 +358,11 @@ class DatabaseManager(DatabaseAdapter):
             st = self._resolve_value(data, 'ST', 'stability')
             hl = self._resolve_value(data, 'HL', 'durability')
             pc = self._resolve_value(data, 'PC', 'power_consumption')
+            source_type = self._resolve_value(data, 'source_type')
+            source_doi = self._resolve_value(data, 'source_doi')
+            source_date = self._resolve_value(data, 'source_date')
+            reliability_category = self._resolve_value(data, 'reliability_category')
+            data_completeness = self._resolve_value(data, 'data_completeness')
 
             with get_connection() as conn:
                 cursor = conn.cursor()
@@ -328,14 +372,19 @@ class DatabaseManager(DatabaseAdapter):
 
                 query = """
                 INSERT OR REPLACE INTO ImmobilizationLayers 
-                (IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM, RP, TR, ST, HL, PC)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (
+                    IM_ID, IM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, Adh, Sol, K_IM,
+                    RP, TR, ST, HL, PC,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
                     im_id, im_name, ph_min, ph_max,
                     t_min, t_max, mp, adh,
                     sol, k_im, rp, tr,
-                    st, hl, pc
+                    st, hl, pc,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
                 ))
                 conn.commit()
                 self.clear_cache()
@@ -370,6 +419,11 @@ class DatabaseManager(DatabaseAdapter):
             lod = self._resolve_value(data, 'LOD', 'lod')
             hl = self._resolve_value(data, 'HL', 'durability')
             pc = self._resolve_value(data, 'PC', 'power_consumption')
+            source_type = self._resolve_value(data, 'source_type')
+            source_doi = self._resolve_value(data, 'source_doi')
+            source_date = self._resolve_value(data, 'source_date')
+            reliability_category = self._resolve_value(data, 'reliability_category')
+            data_completeness = self._resolve_value(data, 'data_completeness')
 
             with get_connection() as conn:
                 cursor = conn.cursor()
@@ -379,14 +433,19 @@ class DatabaseManager(DatabaseAdapter):
 
                 query = """
                 INSERT OR REPLACE INTO MemristiveLayers 
-                (MEM_ID, MEM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, SN, DR_Min, DR_Max, RP, TR, ST, LOD, HL, PC)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (
+                    MEM_ID, MEM_Name, PH_Min, PH_Max, T_Min, T_Max, MP, SN, DR_Min, DR_Max,
+                    RP, TR, ST, LOD, HL, PC,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
                     mem_id, mem_name, ph_min, ph_max,
                     t_min, t_max, mp, sn,
                     dr_min, dr_max, rp, tr,
-                    st, lod, hl, pc
+                    st, lod, hl, pc,
+                    source_type, source_doi, source_date, reliability_category, data_completeness
                 ))
                 conn.commit()
                 self.clear_cache()
