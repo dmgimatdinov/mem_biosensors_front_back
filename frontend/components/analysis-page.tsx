@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FlaskConical, Trophy, BarChart3, Loader2 } from "lucide-react"
+import { FlaskConical, Trophy, BarChart3, Loader2, Sparkles } from "lucide-react"
 import {
   BarChart,
   Bar,
@@ -31,6 +31,19 @@ import {
   Cell,
 } from "recharts"
 import type { StoreData, SensorCombination } from "@/lib/biosensor-store"
+import {
+  getAHPWeights,
+  getEpsilonConstraints,
+  getParetoFrontier,
+  getSensitivityAnalysis,
+  getStabilityAnalysis,
+  getTopsisRanking,
+  type AHPResponse,
+  type MCDARecord,
+  type SensitivityResult,
+  type StabilityResult,
+  type TopsisResultItem,
+} from "@/lib/api-service"
 
 interface AnalysisPageProps {
   data: StoreData
@@ -41,8 +54,23 @@ interface AnalysisPageProps {
 export function AnalysisPage({ data, showNotification, onSynthesizeCombinations }: AnalysisPageProps) {
   const [synthesizing, setSynthesizing] = useState(false)
   const [topN, setTopN] = useState([10])
-  const [selectedCombo, setSelectedCombo] = useState<string>("")
-
+  const [selectedCombo, setSelectedCombo] = useState<string>("")  const [mcdaLoading, setMcdaLoading] = useState(true)
+  const [mcdaError, setMcdaError] = useState<string | null>(null)
+  const [mcdaData, setMcdaData] = useState<{
+    ahp: AHPResponse | null
+    pareto: MCDARecord[]
+    topsis: TopsisResultItem[]
+    epsilon: MCDARecord[]
+    stability: StabilityResult | null
+    sensitivity: SensitivityResult | null
+  }>({
+    ahp: null,
+    pareto: [],
+    topsis: [],
+    epsilon: [],
+    stability: null,
+    sensitivity: null,
+  })
   const sortedCombinations = useMemo(
     () => [...data.combinations].sort((a, b) => b.score - a.score),
     [data.combinations]
@@ -88,9 +116,74 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
     }
   }
 
+  useEffect(() => {
+    let isMounted = true
+
+    const loadMcdaInsights = async () => {
+      setMcdaLoading(true)
+      setMcdaError(null)
+
+      try {
+        const [ahpResult, paretoResult, topsisResult, epsilonResult, stabilityResult, sensitivityResult] =
+          await Promise.allSettled([
+            getAHPWeights(),
+            getParetoFrontier("LoD,ST", 6),
+            getTopsisRanking(6),
+            getEpsilonConstraints("SN_total", { LoD: ["<", 10], TR: ["<", 30] }, 6),
+            getStabilityAnalysis(10, 1000),
+            getSensitivityAnalysis(),
+          ])
+
+        if (!isMounted) return
+
+        const nextState = {
+          ahp: ahpResult.status === "fulfilled" ? ahpResult.value : null,
+          pareto: paretoResult.status === "fulfilled" ? paretoResult.value : [],
+          topsis: topsisResult.status === "fulfilled" ? topsisResult.value : [],
+          epsilon: epsilonResult.status === "fulfilled" ? epsilonResult.value : [],
+          stability: stabilityResult.status === "fulfilled" ? stabilityResult.value : null,
+          sensitivity: sensitivityResult.status === "fulfilled" ? sensitivityResult.value : null,
+        }
+
+        setMcdaData(nextState)
+        const failed = [ahpResult, paretoResult, topsisResult, epsilonResult, stabilityResult, sensitivityResult].filter(
+          (result) => result.status === "rejected"
+        )
+        if (failed.length > 0) {
+          setMcdaError("Some MCDA insights could not be loaded; the existing score view remains available.")
+        }
+      } catch (error) {
+        if (!isMounted) return
+        setMcdaError(error instanceof Error ? error.message : "Unable to load MCDA insights")
+      } finally {
+        if (isMounted) {
+          setMcdaLoading(false)
+        }
+      }
+    }
+
+    loadMcdaInsights()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   const selectedComboData = useMemo((): SensorCombination | undefined => {
     return data.combinations.find((c) => c.id === selectedCombo)
   }, [data.combinations, selectedCombo])
+
+  const getDisplayId = (item: MCDARecord | undefined) => {
+    if (!item) return "—"
+    return item.Combo_ID || item.combo_id || item.id || item.name || "unknown"
+  }
+
+  const formatMetric = (value: unknown) => {
+    if (typeof value === "number") {
+      return Number.isInteger(value) ? value.toString() : value.toFixed(2)
+    }
+    return String(value ?? "—")
+  }
 
   const CHART_COLORS = [
     "hsl(220 14% 88%)",
@@ -264,6 +357,143 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
           </CardContent>
         </Card>
       )}
+
+      {/* MCDA Insights */}
+      <Card className="border-border bg-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+            <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" />
+            MCDA Insights
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {mcdaLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading advanced analytics...
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {mcdaError && (
+                <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  {mcdaError}
+                </div>
+              )}
+              <div className="grid gap-4 xl:grid-cols-3">
+                <div className="rounded-lg border border-border bg-background/70 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">AHP weights</p>
+                    <span className="text-xs text-muted-foreground">{mcdaData.ahp?.is_consistent ? "Consistent" : "Review"}</span>
+                  </div>
+                  {mcdaData.ahp ? (
+                    <div className="space-y-3">
+                      {mcdaData.ahp.weights.map((weight, index) => (
+                        <div key={index}>
+                          <div className="mb-1 flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Criterion {index + 1}</span>
+                            <span className="font-semibold text-foreground">{weight.toFixed(2)}</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-muted">
+                            <div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max(6, weight * 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                      <p className="pt-1 text-xs text-muted-foreground">
+                        CI: {mcdaData.ahp.CI.toFixed(3)} · CR: {mcdaData.ahp.CR.toFixed(3)}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">AHP weights unavailable.</p>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-background/70 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">Pareto / TOPSIS / ε</p>
+                    <span className="text-xs text-muted-foreground">Adaptive ranking</span>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    {mcdaData.pareto.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pareto frontier</p>
+                        <ul className="space-y-1">
+                          {mcdaData.pareto.slice(0, 4).map((item, index) => (
+                            <li key={`${getDisplayId(item)}-${index}`} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
+                              <span className="font-mono text-xs">{getDisplayId(item)}</span>
+                              <span className="text-muted-foreground">{formatMetric(item.Score ?? item.score)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {mcdaData.topsis.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">TOPSIS</p>
+                        <ul className="space-y-1">
+                          {mcdaData.topsis.slice(0, 4).map((item, index) => (
+                            <li key={`${getDisplayId(item.structure)}-${index}`} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
+                              <span className="font-mono text-xs">{getDisplayId(item.structure)}</span>
+                              <span className="text-muted-foreground">{item.score.toFixed(2)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {mcdaData.epsilon.length > 0 ? (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">ε-constraints</p>
+                        <ul className="space-y-1">
+                          {mcdaData.epsilon.slice(0, 4).map((item, index) => (
+                            <li key={`${getDisplayId(item)}-${index}`} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
+                              <span className="font-mono text-xs">{getDisplayId(item)}</span>
+                              <span className="text-muted-foreground">{formatMetric(item.Score ?? item.score)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-background/70 p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">Stability & sensitivity</p>
+                    <span className="text-xs text-muted-foreground">Robustness</span>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    {mcdaData.stability ? (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stress test</p>
+                        <ul className="space-y-1">
+                          {Object.entries(mcdaData.stability).slice(0, 4).map(([id, value]) => (
+                            <li key={id} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
+                              <span className="font-mono text-xs">{id}</span>
+                              <span className="text-muted-foreground">{value.stability_label}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {mcdaData.sensitivity ? (
+                      <div>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Uncertainty</p>
+                        <ul className="space-y-1">
+                          {Object.entries(mcdaData.sensitivity).slice(0, 4).map(([id, value]) => (
+                            <li key={id} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
+                              <span className="font-mono text-xs">{id}</span>
+                              <span className="text-muted-foreground">{value.flags.length > 0 ? "Check" : "Stable"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Score Distribution Chart */}
       <Card className="border-border bg-card">

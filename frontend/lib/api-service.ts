@@ -148,6 +148,39 @@ interface StatisticsResponse {
   average_score: number
 }
 
+export interface AHPResponse {
+  weights: number[]
+  CI: number
+  CR: number
+  is_consistent: boolean
+}
+
+export interface MCDARecord {
+  [key: string]: any
+}
+
+export interface TopsisResultItem {
+  structure: MCDARecord
+  score: number
+}
+
+export interface StabilityResult {
+  [structureId: string]: {
+    rank_distribution: number[]
+    stability_label: string
+    mean_rank: number
+  }
+}
+
+export interface SensitivityResult {
+  [structureId: string]: {
+    rank_change: number
+    flags: string[]
+    baseline_rank: number
+    adjusted_rank: number
+  }
+}
+
 /**
  * API Error Class
  */
@@ -297,6 +330,40 @@ export async function getBestCombinations(limit = 10): Promise<SensorCombination
 
 export async function getComparativeAnalysis(): Promise<any> {
   return fetchApi(API_ENDPOINTS.analyticsComparative)
+}
+
+export async function getAHPWeights(matrix = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]): Promise<AHPResponse> {
+  return fetchApi(API_ENDPOINTS.analyticsAHP, {
+    method: "POST",
+    body: JSON.stringify({ matrix }),
+  })
+}
+
+export async function getParetoFrontier(criteria = "LoD,ST", limit = 10): Promise<MCDARecord[]> {
+  return fetchApi(`${API_ENDPOINTS.analyticsPareto}?criteria=${encodeURIComponent(criteria)}&limit=${limit}`)
+}
+
+export async function getTopsisRanking(limit = 10): Promise<TopsisResultItem[]> {
+  return fetchApi(`${API_ENDPOINTS.analyticsTopsis}?limit=${limit}`)
+}
+
+export async function getEpsilonConstraints(
+  objective = "SN_total",
+  constraints = { LoD: ["<", 10], TR: ["<", 30] },
+  limit = 10
+): Promise<MCDARecord[]> {
+  return fetchApi(API_ENDPOINTS.analyticsEpsilonConstraints, {
+    method: "POST",
+    body: JSON.stringify({ objective, constraints, limit }),
+  })
+}
+
+export async function getStabilityAnalysis(topK = 10, nSimulations = 1000): Promise<StabilityResult> {
+  return fetchApi(`${API_ENDPOINTS.analyticsStability}?top_k=${topK}&n_simulations=${nSimulations}`)
+}
+
+export async function getSensitivityAnalysis(): Promise<SensitivityResult> {
+  return fetchApi(API_ENDPOINTS.analyticsSensitivity)
 }
 
 /**
