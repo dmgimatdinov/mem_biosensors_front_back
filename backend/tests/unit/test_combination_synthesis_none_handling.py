@@ -95,6 +95,23 @@ def test_synthesize_all_combinations_v2_skips_test_records(monkeypatch):
     assert called == []
 
 
+def test_insert_analyte_persists_is_test_flag(tmp_db):
+    result = tmp_db.insert_analyte({
+        "TA_ID": "TA_TEST_FLAG",
+        "TA_Name": "Test analyte",
+        "PH_Min": 3.0,
+        "PH_Max": 8.0,
+        "T_Max": 40.0,
+        "ST": 1.0,
+        "is_test": True,
+    })
+
+    assert result is True
+    row = tmp_db.list_all_analytes()[0]
+    assert row["TA_ID"] == "TA_TEST_FLAG"
+    assert row["is_test"] == 1
+
+
 def test_delete_sensor_combinations_only_removes_test_marked_rows(tmp_db):
     tmp_db.insert_analyte({"TA_ID": "TA_1", "TA_Name": "A1", "PH_Min": 3.0, "PH_Max": 8.0, "T_Max": 40.0, "ST": 1.0})
     tmp_db.insert_analyte({"TA_ID": "TA_2", "TA_Name": "A2", "PH_Min": 3.0, "PH_Max": 8.0, "T_Max": 40.0, "ST": 1.0})
