@@ -188,4 +188,49 @@ ALL_MIGRATIONS = [
     migration_v1_add_created_at,
     migration_v2_add_updated_at,
     migration_v3_add_reliability_fields,
+    # v4: add is_test flag and protective triggers
+    # migration_v4_protect_non_test will be appended here
 ]
+
+def migration_v4_protect_non_test(db_name: str) -> None:
+    """Миграция v4: добавление флага `is_test` и триггеров, запрещающих удалять нетестовые записи."""
+    tables = [
+        "Analytes",
+        "BioRecognitionLayers",
+        "ImmobilizationLayers",
+        "MemristiveLayers",
+        "SensorCombinations",
+    ]
+
+    conn = sqlite3.connect(db_name)
+    try:
+        for table in tables:
+            if not _table_exists(conn, table):
+                continue
+
+            # Add is_test column if missing
+            _add_column_if_missing(conn, table, "is_test", "INTEGER DEFAULT 0")
+
+            # Create BEFORE DELETE trigger to prevent deleting non-test rows
+            trigger_name = f"protect_delete_{table}"
+            try:
+                conn.execute(f"DROP TRIGGER IF EXISTS {trigger_name}")
+            except Exception:
+                pass
+
+            conn.execute(f"""
+                CREATE TRIGGER IF NOT EXISTS {trigger_name}
+                BEFORE DELETE ON {table}
+                FOR EACH ROW
+                WHEN (OLD.is_test IS NULL OR OLD.is_test = 0)
+                BEGIN
+                    SELECT RAISE(ABORT, 'Attempt to delete non-test data is forbidden');
+                END;
+            """)
+
+        conn.commit()
+    finally:
+        conn.close()
+
+# Append migration_v4 to migrations list
+ALL_MIGRATIONS.append(migration_v4_protect_non_test)

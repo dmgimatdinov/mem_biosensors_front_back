@@ -1,5 +1,7 @@
 # db/manager.py
 import sqlite3
+import os
+import shutil
 from enum import Enum
 from typing import Dict, Any, List
 import logging
@@ -10,7 +12,7 @@ from db.migrations import MigrationManager, ALL_MIGRATIONS
 
 from services.biosensor_service import DatabaseAdapter
 
-DB_NAME = "memristive_biosensor.db"
+DB_NAME = os.getenv("DATABASE_PATH", "memristive_biosensor.db")
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +88,53 @@ class DatabaseManager(DatabaseAdapter):
     def __init__(self, db_name: str = DB_NAME):
         self.db_name = db_name
         self.logger = logger
-        
-         # Применить миграции ПЕРЕД созданием таблиц
+        # Если есть бэкап и основная БД пуста/потеряла данные — восстановим из бэкапа
+        try:
+            backup_path = f"{db_name}.backup"
+            if os.path.exists(backup_path):
+                need_restore = False
+                # Если база не существует — восстановим
+                if not os.path.exists(db_name):
+                    need_restore = True
+                else:
+                    try:
+                        with sqlite3.connect(db_name) as conn_main, sqlite3.connect(backup_path) as conn_bak:
+                            cursor_main = conn_main.cursor()
+                            cursor_bak = conn_bak.cursor()
+                            # Проверяем суммарное количество строк в ключевых таблицах
+                            tables = ["Analytes", "BioRecognitionLayers", "ImmobilizationLayers", "MemristiveLayers"]
+                            main_count = 0
+                            bak_count = 0
+                            for t in tables:
+                                try:
+                                    cursor_main.execute(f"SELECT COUNT(1) FROM {t}")
+                                    main_count += cursor_main.fetchone()[0]
+                                except sqlite3.Error:
+                                    # Таблица отсутствует или ошибка — считаем как 0
+                                    pass
+                                try:
+                                    cursor_bak.execute(f"SELECT COUNT(1) FROM {t}")
+                                    bak_count += cursor_bak.fetchone()[0]
+                                except sqlite3.Error:
+                                    pass
+
+                            if bak_count > 0 and main_count == 0:
+                                need_restore = True
+                    except sqlite3.Error:
+                        # Если не удалось прочитать, не восстанавливаем автоматически
+                        need_restore = False
+
+                if need_restore:
+                    try:
+                        shutil.copy2(backup_path, db_name)
+                        self.logger.info(f"БД восстановлена из бэкапа: {backup_path} -> {db_name}")
+                    except Exception as e:
+                        self.logger.error(f"Не удалось восстановить БД из бэкапа: {e}")
+        except Exception:
+            # Не критично, продолжаем — мигратор сам создаст таблицы
+            pass
+
+        # Применить миграции ПЕРЕД созданием таблиц
         migrator = MigrationManager(db_name)
         migrator.migrate(ALL_MIGRATIONS)
         
