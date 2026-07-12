@@ -17,6 +17,7 @@ def jwt_client():
 
 
 def test_login_refresh_logout_cycle(jwt_client):
+    print("Running test_login_refresh_logout_cycle")
     login = jwt_client.post("/api/auth/login", json={"username": "admin", "password": "admin"})
     assert login.status_code == 200
     tokens = login.json()
@@ -39,6 +40,7 @@ def _admin_headers(jwt_client):
 
 
 def test_register_requires_admin_role(jwt_client):
+    print("Running test_register_requires_admin_role")
     # bootstrap a designer via admin
     headers = _admin_headers(jwt_client)
     created = jwt_client.post(

@@ -4,6 +4,7 @@ import pytest
 class TestCORS:
 
     def test_cors_preflight_localhost_3000(self, api_client):
+        print("Running test_cors_preflight_localhost_3000")
         """OPTIONS с Origin: http://localhost:3000 → разрешено."""
         response = api_client.options(
             "/api/analytes",
