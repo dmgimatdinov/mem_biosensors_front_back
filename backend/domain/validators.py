@@ -177,9 +177,9 @@ class CombinationValidator:
     
     @staticmethod
     def check_ph_compatibility(
-        analyte_ph_min: float,
-        analyte_ph_max: float,
-        *layer_ph_ranges: tuple[float, float],
+        analyte_ph_min: Optional[float],
+        analyte_ph_max: Optional[float],
+        *layer_ph_ranges: tuple[Optional[float], Optional[float]],
     ) -> Tuple[bool, Optional[str]]:
         """
         Проверка пересечения диапазонов pH.
@@ -188,20 +188,25 @@ class CombinationValidator:
             analyte_ph_min, analyte_ph_max: диапазон pH аналита
             *layer_ph_ranges: кортежи (ph_min, ph_max) для каждого слоя
         """
+        if analyte_ph_min is None or analyte_ph_max is None:
+            return True, None
+
         for layer_ph_min, layer_ph_max in layer_ph_ranges:
+            if layer_ph_min is None or layer_ph_max is None:
+                continue
             if not (analyte_ph_min <= layer_ph_max and analyte_ph_max >= layer_ph_min):
                 return False, "Диапазоны pH не пересекаются"
         return True, None
     
     @staticmethod
     def check_temperature_compatibility(
-        analyte_t_max: float,
-        bio_t_min: float,
-        bio_t_max: float,
-        immob_t_min: float,
-        immob_t_max: float,
-        mem_t_min: float,
-        mem_t_max: float,
+        analyte_t_max: Optional[float],
+        bio_t_min: Optional[float],
+        bio_t_max: Optional[float],
+        immob_t_min: Optional[float],
+        immob_t_max: Optional[float],
+        mem_t_min: Optional[float],
+        mem_t_max: Optional[float],
     ) -> Tuple[bool, Optional[str]]:
         """
         Проверка температурной совместимости всех слоёв.
@@ -210,6 +215,9 @@ class CombinationValidator:
         1. Все слои работают в пределах T_max аналита
         2. Все слои совместимы по минимальной температуре мемристора
         """
+        if any(value is None for value in (analyte_t_max, bio_t_max, immob_t_max, mem_t_max, bio_t_min, immob_t_min, mem_t_min)):
+            return True, None
+
         # Условие 1: макс. температуры слоёв ≤ макс. температура аналита
         if not (bio_t_max <= analyte_t_max and immob_t_max <= analyte_t_max):
             return False, "Температура слоёв превышает T_max аналита"
@@ -226,11 +234,13 @@ class CombinationValidator:
     
     @staticmethod
     def check_mechanical_compatibility(
-        immob_mp: float,
-        mem_mp: float,
+        immob_mp: Optional[float],
+        mem_mp: Optional[float],
         mp_tolerance: float = 50.0,
     ) -> Tuple[bool, Optional[str]]:
         """Проверка механической совместимости слоёв."""
+        if immob_mp is None or mem_mp is None:
+            return True, None
         if abs(immob_mp - mem_mp) > mp_tolerance:
             return False, f"Модули Юнга несовместимы (разница > {mp_tolerance})"
         return True, None

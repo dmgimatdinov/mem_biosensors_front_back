@@ -23,7 +23,7 @@ class CombinationSynthesisService:
         self.db = db
         self.compatibility_v2 = CompatibilityEngineV2()
     
-    def synthesize_all_combinations(self, max_combinations: int = 10000) -> Tuple[int, int]:
+    def synthesize_all_combinations(self, max_combinations: int = 10000) -> Dict[str, int]:
         """
         Синтез всех совместимых комбинаций.
         
@@ -65,8 +65,8 @@ class CombinationSynthesisService:
                             )
                             if result:
                                 successfully_created += 1
-                        except Exception as e:
-                            logger.error(f"Ошибка при создании комбинации: {e}")
+                        except Exception:
+                            logger.exception("Ошибка при создании комбинации")
         
         logger.info(f"Синтез завершён: {total_checked} проверено, {successfully_created} создано")
         return {"checked": total_checked, "created": successfully_created}
@@ -249,22 +249,23 @@ class CombinationSynthesisService:
                             return {"checked": total_checked, "created": successfully_created}
 
                         total_checked += 1
-                        if self.create_combination_v2(
-                            analyte,
-                            bio_layer,
-                            immob_layer,
-                            mem_layer,
-                            application_profile=application_profile,
-                        ):
-                            successfully_created += 1
+                        try:
+                            if self.create_combination_v2(
+                                analyte,
+                                bio_layer,
+                                immob_layer,
+                                mem_layer,
+                                application_profile=application_profile,
+                            ):
+                                successfully_created += 1
+                        except Exception:
+                            logger.exception("Ошибка при создании комбинации v2")
 
         return {"checked": total_checked, "created": successfully_created}
     
     @staticmethod
     def _normalize_record(record: Dict[str, Any], kind: str) -> Dict[str, Any]:
-        normalized = {}
-        for key, value in record.items():
-            normalized[key] = value
+        normalized = dict(record)
 
         aliases = {
             "analyte": {
@@ -374,7 +375,13 @@ class CombinationSynthesisService:
         score = 0.0
         
         for metric_name, weight in weights.items():
-            value = metrics.get(f'{metric_name}_total', 0)
+            raw_value = metrics.get(f'{metric_name}_total', 0)
+            if raw_value is None:
+                raw_value = 0.0
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                value = 0.0
             normalized = normalizer.normalize(value, metric_name)
             score += normalized * weight
         
