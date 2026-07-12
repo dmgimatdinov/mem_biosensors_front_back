@@ -3,6 +3,8 @@
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
+import settings
+from domain import metrics_v1, metrics_v2
 from services.score_normalizer import calculate_score
 
 class MetricsNormalizer:
@@ -58,6 +60,131 @@ class MetricsNormalizer:
     def set_reference(kind: str, value: float):
         """Переопределение эталонного значения для метрики."""
         MetricsNormalizer.REFERENCE_VALUES[kind] = value
+
+
+def get_metrics_version() -> str:
+    version = getattr(settings, "METRICS_VERSION", "v1")
+    if version not in {"v1", "v2"}:
+        return "v1"
+    return version
+
+
+def _metrics_backend():
+    return metrics_v2 if get_metrics_version() == "v2" else metrics_v1
+
+
+def calculate_sensitivity(
+    bre: Dict[str, Any],
+    mem: Dict[str, Any],
+    immob: Dict[str, Any],
+    d_im: Optional[float] = None,
+    d_eff: Optional[float] = None,
+) -> float:
+    backend = _metrics_backend()
+    return backend.calculate_sensitivity(bre, mem, immob) if backend is metrics_v1 else backend.calculate_sensitivity(
+        bre,
+        mem,
+        immob,
+        d_im=d_im,
+        d_eff=d_eff,
+    )
+
+
+def calculate_response_time(
+    bre: Dict[str, Any],
+    immob: Dict[str, Any],
+    mem: Dict[str, Any],
+    d_im: Optional[float] = None,
+    d_eff: Optional[float] = None,
+) -> float:
+    backend = _metrics_backend()
+    return backend.calculate_response_time(bre, immob, mem) if backend is metrics_v1 else backend.calculate_response_time(
+        bre,
+        immob,
+        mem,
+        d_im=d_im,
+        d_eff=d_eff,
+    )
+
+
+def calculate_stability(
+    analyte: Optional[Dict[str, Any]],
+    bre: Dict[str, Any],
+    immob: Dict[str, Any],
+    mem: Dict[str, Any],
+) -> float:
+    return _metrics_backend().calculate_stability(analyte, bre, immob, mem)
+
+
+def calculate_lod(
+    bre: Dict[str, Any],
+    mem: Dict[str, Any],
+    sensitivity: Optional[float] = None,
+    i_read: Optional[float] = None,
+    snr_mem: Optional[float] = None,
+    immob: Optional[Dict[str, Any]] = None,
+) -> float:
+    backend = _metrics_backend()
+    if backend is metrics_v1:
+        return backend.calculate_lod(bre, mem, sensitivity=sensitivity)
+    return backend.calculate_lod(
+        bre,
+        mem,
+        sensitivity=sensitivity,
+        i_read=i_read,
+        snr_mem=snr_mem,
+        immob=immob,
+    )
+
+
+def calculate_dynamic_range(
+    bre: Dict[str, Any],
+    mem: Dict[str, Any],
+    lod: Optional[float] = None,
+    k_m: Optional[float] = None,
+    c_max: Optional[float] = None,
+) -> float:
+    return _metrics_backend().calculate_dynamic_range(bre, mem, lod=lod, k_m=k_m, c_max=c_max)
+
+
+def calculate_reproducibility(
+    bre: Dict[str, Any],
+    immob: Dict[str, Any],
+    mem: Dict[str, Any],
+    cv: Optional[float] = None,
+) -> float:
+    return _metrics_backend().calculate_reproducibility(bre, immob, mem, cv=cv)
+
+
+def calculate_half_life(bre: Dict[str, Any], immob: Dict[str, Any], mem: Dict[str, Any]) -> float:
+    return _metrics_backend().calculate_half_life(bre, immob, mem)
+
+
+def normalize_metric(
+    value: float,
+    min_value: float,
+    max_value: float,
+    greater_is_better: bool,
+) -> float:
+    return _metrics_backend().normalize_metric(
+        value,
+        min_value=min_value,
+        max_value=max_value,
+        greater_is_better=greater_is_better,
+    )
+
+
+def compute_data_completeness_vector(structure: Dict[str, Any]) -> Tuple[Dict[str, int], float, str]:
+    return _metrics_backend().compute_data_completeness_vector(structure)
+
+
+def calculate_combination_metrics(
+    analyte: Dict[str, Any],
+    bre: Dict[str, Any],
+    immob: Dict[str, Any],
+    mem: Dict[str, Any],
+) -> Dict[str, float]:
+    return _metrics_backend().calculate_combination_metrics(analyte, bre, immob, mem)
 
 
 _METRIC_KEYS = {

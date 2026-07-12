@@ -123,6 +123,7 @@ class Passport:
     immobilization_layer: ImmobilizationLayer
     memristive_layer: MemristiveLayer
     combination: Optional[SensorCombination] = None
+    metrics_version: str = "v1"
     
     def to_dict(self) -> Dict[str, Any]:
         """Сериализация паспорта в словарь"""

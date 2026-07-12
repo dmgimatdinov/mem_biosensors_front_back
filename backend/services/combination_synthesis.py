@@ -5,6 +5,7 @@ from domain.validators import CombinationValidator
 from domain.compatibility import CompatibilityEngineV2
 from domain.metrics import (
     MetricsNormalizer,
+    calculate_combination_metrics,
     calculate_final_score,
     calculate_reliability_coefficient,
     infer_reliability_inputs,
@@ -341,41 +342,8 @@ class CombinationSynthesisService:
     def _calculate_metrics(
         analyte: Dict, bio: Dict, immob: Dict, mem: Dict
     ) -> Dict[str, float]:
-        """Расчёт интегральных характеристик комбинации."""
-        metrics = {}
-        
-        # Чувствительность (произведение + K_IM)
-        metrics['SN_total'] = bio.get('SN', 0) * mem.get('SN', 0) * immob.get('K_IM', 1)
-        
-        # Время отклика (сумма)
-        metrics['TR_total'] = bio.get('TR', 0) + immob.get('TR', 0) + mem.get('TR', 0)
-        
-        # Стабильность (минимум)
-        metrics['ST_total'] = min(bio.get('ST', 0), immob.get('ST', 0), mem.get('ST', 0))
-        
-        # Воспроизводимость (минимум)
-        metrics['RP_total'] = min(bio.get('RP', 0), immob.get('RP', 0), mem.get('RP', 0))
-        
-        # Предел обнаружения (максимум = хуже)
-        metrics['LOD_total'] = max(bio.get('LOD', 0), mem.get('LOD', 0))
-        
-        # Диапазон (пересечение)
-        bio_dr_min = bio.get('DR_Min', 0)
-        bio_dr_max = bio.get('DR_Max', float('inf'))
-        mem_dr_min = mem.get('DR_Min', 0)
-        mem_dr_max = mem.get('DR_Max', float('inf'))
-        
-        dr_min = max(bio_dr_min, mem_dr_min)
-        dr_max = min(bio_dr_max, mem_dr_max)
-        metrics['DR_total'] = max(0, dr_max - dr_min)
-        
-        # Долговечность (минимум)
-        metrics['HL_total'] = min(bio.get('HL', 0), immob.get('HL', 0), mem.get('HL', 0))
-        
-        # Энергопотребление (сумма)
-        metrics['PC_total'] = bio.get('PC', 0) + immob.get('PC', 0) + mem.get('PC', 0)
-        
-        return metrics
+        """Расчёт интегральных характеристик комбинации через фасад версий метрик."""
+        return calculate_combination_metrics(analyte, bio, immob, mem)
     
     @staticmethod
     def _calculate_score(metrics: Dict[str, float]) -> float:
