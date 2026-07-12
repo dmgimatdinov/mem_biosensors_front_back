@@ -452,6 +452,31 @@ async def synthesize_combinations(max_combinations: int = Query(10000, ge=1, le=
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/combinations/synthesize-v2")
+async def synthesize_combinations_v2(
+    application_profile: str = Query("PoC", pattern=r"^(PoC|LoC|Clinical_Diagnostics)$"),
+    max_combinations: int = Query(10000, ge=1, le=50000),
+):
+    """Synthesize new sensor combinations using CompatibilityEngineV2."""
+    try:
+        result = combination_service.synthesize_all_combinations_v2(
+            max_combinations=max_combinations,
+            application_profile=application_profile,
+        )
+        return {
+            "success": True,
+            "checked": result["checked"],
+            "created": result["created"],
+            "message": (
+                f"✅ V2 checked {result['checked']} possible combinations, "
+                f"created {result['created']} new ones"
+            ),
+        }
+    except Exception as e:
+        logger.error(f"Error synthesizing combinations with V2: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== Analytics Endpoints ====================
 
 @app.get("/api/analytics/statistics")

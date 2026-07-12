@@ -2,6 +2,7 @@
 
 from db.manager import DatabaseManager, TableConfig
 from domain.validators import CombinationValidator
+from domain.compatibility import CompatibilityEngineV2
 from domain.metrics import (
     MetricsNormalizer,
     calculate_final_score,
@@ -19,6 +20,7 @@ class CombinationSynthesisService:
     
     def __init__(self, db: DatabaseManager):
         self.db = db
+        self.compatibility_v2 = CompatibilityEngineV2()
     
     def synthesize_all_combinations(self, max_combinations: int = 10000) -> Tuple[int, int]:
         """
@@ -93,10 +95,10 @@ class CombinationSynthesisService:
         if not is_valid:
             logger.debug(f"Комбинация {analyte.get('TA_ID', analyte.get('ta_id'))}-{bio_layer.get('BRE_ID', bio_layer.get('bre_id'))}-{immob_layer.get('IM_ID', immob_layer.get('im_id'))}-{mem_layer.get('MEM_ID', mem_layer.get('mem_id'))}: {error_msg}")
             return False
-        
+
         # Расчёт интегральных метрик
         metrics = self._calculate_metrics(analyte, bio_layer, immob_layer, mem_layer)
-        
+
         # Расчёт базового Score
         raw_score = self._calculate_score(metrics)
         eta, alpha, gamma = infer_reliability_inputs({
@@ -108,10 +110,10 @@ class CombinationSynthesisService:
         })
         kappa = calculate_reliability_coefficient(eta=eta, alpha=alpha, gamma=gamma)
         score = max(0.0, min(10.0, calculate_final_score(raw_score, kappa)))
-        
+
         # ID комбинации
         combo_id = f"COMBO_{analyte.get('TA_ID', analyte.get('ta_id'))}_{bio_layer.get('BRE_ID', bio_layer.get('bre_id'))}_{immob_layer.get('IM_ID', immob_layer.get('im_id'))}_{mem_layer.get('MEM_ID', mem_layer.get('mem_id'))}"
-        
+
         # Подготовка данных для БД
         combination_data = {
             'Combo_ID': combo_id,
@@ -130,9 +132,9 @@ class CombinationSynthesisService:
             'Score': score,
             'created_at': None,
         }
-        
+
         result = self.db.insert_sensor_combination(combination_data)
-        
+
         if result is True:
             logger.info(
                 f"✅ Комбинация {combo_id} создана "
@@ -145,6 +147,117 @@ class CombinationSynthesisService:
         else:
             logger.error(f"❌ Ошибка при добавлении комбинации {combo_id}")
             return False
+
+    def create_combination_v2(
+        self,
+        analyte: Dict[str, Any],
+        bio_layer: Dict[str, Any],
+        immob_layer: Dict[str, Any],
+        mem_layer: Dict[str, Any],
+        application_profile: str = "PoC",
+    ) -> bool:
+        """Создание комбинации через новый CompatibilityEngineV2."""
+        analyte = self._normalize_record(analyte, "analyte")
+        bio_layer = self._normalize_record(bio_layer, "bio")
+        immob_layer = self._normalize_record(immob_layer, "immob")
+        mem_layer = self._normalize_record(mem_layer, "mem")
+
+        structure = {
+            "analyte": analyte,
+            "bio_layer": bio_layer,
+            "immobilization_layer": immob_layer,
+            "memristive_layer": mem_layer,
+            "iso_10993": True,
+            "temperature_resistant": True,
+        }
+
+        stage1_ok, stage1_failed = self.compatibility_v2.validate_stage1(structure)
+        if not stage1_ok:
+            logger.debug(f"V2 Stage1 failed: {stage1_failed}")
+            return False
+
+        metrics = self._calculate_metrics(analyte, bio_layer, immob_layer, mem_layer)
+        structure.update(metrics)
+        structure["PC_total"] = metrics.get("PC_total", 0)
+        structure["TR_total"] = metrics.get("TR_total", 0)
+        structure["ST_total"] = metrics.get("ST_total", 0)
+
+        stage2_ok, stage2_failed = self.compatibility_v2.validate_stage2(structure, application_profile)
+        if not stage2_ok:
+            logger.debug(f"V2 Stage2 failed: {stage2_failed}")
+            return False
+
+        raw_score = self._calculate_score(metrics)
+        eta, alpha, gamma = infer_reliability_inputs({
+            'analyte': analyte,
+            'bio_layer': bio_layer,
+            'immobilization_layer': immob_layer,
+            'memristive_layer': mem_layer,
+            **metrics,
+        })
+        kappa = calculate_reliability_coefficient(eta=eta, alpha=alpha, gamma=gamma)
+        score = max(0.0, min(10.0, calculate_final_score(raw_score, kappa)))
+
+        combo_id = (
+            f"COMBO_{analyte.get('TA_ID', analyte.get('ta_id'))}_"
+            f"{bio_layer.get('BRE_ID', bio_layer.get('bre_id'))}_"
+            f"{immob_layer.get('IM_ID', immob_layer.get('im_id'))}_"
+            f"{mem_layer.get('MEM_ID', mem_layer.get('mem_id'))}"
+        )
+
+        combination_data = {
+            'Combo_ID': combo_id,
+            'TA_ID': analyte.get('TA_ID', analyte.get('ta_id')),
+            'BRE_ID': bio_layer.get('BRE_ID', bio_layer.get('bre_id')),
+            'IM_ID': immob_layer.get('IM_ID', immob_layer.get('im_id')),
+            'MEM_ID': mem_layer.get('MEM_ID', mem_layer.get('mem_id')),
+            'SN_total': metrics['SN_total'],
+            'TR_total': metrics['TR_total'],
+            'ST_total': metrics['ST_total'],
+            'RP_total': metrics['RP_total'],
+            'LOD_total': metrics['LOD_total'],
+            'DR_total': metrics['DR_total'],
+            'HL_total': metrics['HL_total'],
+            'PC_total': metrics['PC_total'],
+            'Score': score,
+            'created_at': None,
+        }
+
+        result = self.db.insert_sensor_combination(combination_data)
+        return result is True
+
+    def synthesize_all_combinations_v2(
+        self,
+        max_combinations: int = 10000,
+        application_profile: str = "PoC",
+    ) -> Dict[str, int]:
+        """Синтез комбинаций через CompatibilityEngineV2."""
+        analytes = self.db.list_all_analytes()
+        bio_layers = self.db.list_all_bio_recognition_layers()
+        immob_layers = self.db.list_all_immobilization_layers()
+        mem_layers = self.db.list_all_memristive_layers()
+
+        total_checked = 0
+        successfully_created = 0
+
+        for analyte in analytes:
+            for bio_layer in bio_layers:
+                for immob_layer in immob_layers:
+                    for mem_layer in mem_layers:
+                        if total_checked >= max_combinations:
+                            return {"checked": total_checked, "created": successfully_created}
+
+                        total_checked += 1
+                        if self.create_combination_v2(
+                            analyte,
+                            bio_layer,
+                            immob_layer,
+                            mem_layer,
+                            application_profile=application_profile,
+                        ):
+                            successfully_created += 1
+
+        return {"checked": total_checked, "created": successfully_created}
     
     @staticmethod
     def _normalize_record(record: Dict[str, Any], kind: str) -> Dict[str, Any]:
