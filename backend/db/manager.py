@@ -595,6 +595,64 @@ class DatabaseManager(DatabaseAdapter):
             self.logger.error(f"Ошибка БД: {e}")
             return False
 
+    def delete_sensor_combinations(
+        self,
+        combo_ids: List[str] | None = None,
+        only_test: bool = True,
+        allow_non_test: bool = False,
+    ) -> int:
+        """Безопасное удаление комбинаций из SensorCombinations.
+
+        По умолчанию удаляются только тестовые комбинации: либо те, где `is_test = 1`,
+        либо те, чей `Combo_ID`/связанные ID содержат суффиксы `_TEST` или `_DUP`.
+        При `allow_non_test=True` можно явно удалить и нетестовые комбинации.
+        """
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+
+                column_exists = False
+                try:
+                    cursor.execute("PRAGMA table_info(SensorCombinations)")
+                    column_exists = any(row[1] == "is_test" for row in cursor.fetchall())
+                except sqlite3.Error:
+                    column_exists = False
+
+                if combo_ids:
+                    placeholders = ", ".join("?" for _ in combo_ids)
+                    where_clause = f"Combo_ID IN ({placeholders})"
+                    params: List[Any] = list(combo_ids)
+                else:
+                    where_clause = "1=1"
+                    params = []
+
+                if only_test and not allow_non_test:
+                    test_predicate = "Combo_ID LIKE '%TEST%' OR Combo_ID LIKE '%_DUP%' OR Combo_ID LIKE '%_TEST%'"
+                    if column_exists:
+                        test_predicate = f"({test_predicate} OR is_test = 1)"
+                    where_clause += f" AND ({test_predicate})"
+
+                if only_test and not allow_non_test and column_exists:
+                    cursor.execute(
+                        f"UPDATE SensorCombinations SET is_test = 1 WHERE {where_clause}",
+                        params,
+                    )
+
+                cursor.execute(
+                    f"DELETE FROM SensorCombinations WHERE {where_clause}",
+                    params,
+                )
+                conn.commit()
+                self.clear_cache()
+                deleted_count = cursor.rowcount
+                self.logger.info(
+                    f"Удалено {deleted_count} комбинаций из SensorCombinations"
+                )
+                return deleted_count
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка удаления комбинаций сенсоров: {e}")
+            return 0
+
     # --- LIST методы с кэшем ---
     @lru_cache(maxsize=32)
     def list_all_analytes(self) -> List[Dict[str, Any]]:
