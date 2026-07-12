@@ -54,7 +54,8 @@ interface AnalysisPageProps {
 export function AnalysisPage({ data, showNotification, onSynthesizeCombinations }: AnalysisPageProps) {
   const [synthesizing, setSynthesizing] = useState(false)
   const [topN, setTopN] = useState([10])
-  const [selectedCombo, setSelectedCombo] = useState<string>("")  const [mcdaLoading, setMcdaLoading] = useState(true)
+  const [selectedCombo, setSelectedCombo] = useState<string>("");
+  const [mcdaLoading, setMcdaLoading] = useState(true);
   const [mcdaError, setMcdaError] = useState<string | null>(null)
   const [mcdaData, setMcdaData] = useState<{
     ahp: AHPResponse | null
