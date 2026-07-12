@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import sys
+
 
 _AUTH_CONNECTION: Optional[sqlite3.Connection] = None
 
