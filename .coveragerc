@@ -1,0 +1,8 @@
+[run]
+source = backend
+omit =
+    backend/tests/*
+
+[report]
+omit =
+    backend/tests/*
