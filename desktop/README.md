@@ -54,6 +54,20 @@ Run UNINSTALL.bat to remove the local data and launcher files.
 - If port 8000 is busy, the launcher automatically tries the next free port.
 - If the browser does not open, open http://127.0.0.1:8000 manually.
 
+## Download latest release
+
+Download the latest portable build from the GitHub Releases page for this repository. The artifact is named:
+
+- MemBiosensors_Portable_v{version}_win-x64.zip
+
+## Verify checksum
+
+After downloading the archive, verify the SHA256 checksum using:
+
+- sha256sum MemBiosensors_Portable_v{version}_win-x64.zip
+
+Compare it with the checksum published in the release assets.
+
 ## Support
 
 Contact the project maintainer for help with portable builds.
