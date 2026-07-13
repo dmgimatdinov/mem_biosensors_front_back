@@ -106,11 +106,11 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
     try {
       const result = await onSynthesizeCombinations(10000)
       showNotification(
-        `Synthesis complete: ${result.checked} checked, ${result.created} new combinations created`,
+        `Синтез завершён: проверено ${result.checked}, создано новых комбинаций: ${result.created}`,
         "success"
       )
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to synthesize combinations"
+      const errorMessage = error instanceof Error ? error.message : "Не удалось выполнить синтез комбинаций"
       showNotification(errorMessage, "error")
     } finally {
       setSynthesizing(false)
@@ -151,11 +151,11 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
           (result) => result.status === "rejected"
         )
         if (failed.length > 0) {
-          setMcdaError("Some MCDA insights could not be loaded; the existing score view remains available.")
+          setMcdaError("Некоторые данные MCDA не загружены; доступ к Score сохранён.")
         }
       } catch (error) {
         if (!isMounted) return
-        setMcdaError(error instanceof Error ? error.message : "Unable to load MCDA insights")
+        setMcdaError(error instanceof Error ? error.message : "Не удалось загрузить данные MCDA")
       } finally {
         if (isMounted) {
           setMcdaLoading(false)
@@ -203,10 +203,10 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-foreground">
-          Analysis & Synthesis
+          Анализ и синтез
         </h2>
         <p className="text-sm text-muted-foreground">
-          Synthesize combinations and analyze sensor performance
+          Синтез комбинаций и анализ характеристик сенсоров
         </p>
       </div>
 
@@ -217,9 +217,9 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
               <FlaskConical className="h-6 w-6 text-primary" aria-hidden="true" />
             </div>
-            <h3 className="font-semibold text-foreground">Synthesize</h3>
+            <h3 className="font-semibold text-foreground">Синтез</h3>
             <p className="text-center text-xs text-muted-foreground">
-              Generate all possible sensor combinations (max 5000)
+              Генерация всех возможных комбинаций сенсоров (макс. 5000)
             </p>
             <Button
               onClick={handleSynthesize}
@@ -229,12 +229,12 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
               {synthesizing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Synthesizing...
+                  Синтез...
                 </>
               ) : (
                 <>
                   <FlaskConical className="h-4 w-4" />
-                  Run Synthesis
+                  Запустить синтез
                 </>
               )}
             </Button>
@@ -246,13 +246,13 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
             <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: "hsl(32 85% 48% / 0.1)" }}>
               <Trophy className="h-6 w-6" style={{ color: "hsl(32 85% 48%)" }} aria-hidden="true" />
             </div>
-            <h3 className="font-semibold text-foreground">Top Combinations</h3>
+            <h3 className="font-semibold text-foreground">Лучшие комбинации</h3>
             <p className="text-center text-xs text-muted-foreground">
-              {stats.total} total combinations available
+              Всего доступно комбинаций: {stats.total}
             </p>
             <div className="mt-2 w-full">
               <p className="mb-1 text-xs text-muted-foreground">
-                Show top {topN[0]} results
+                Показать лучшие {topN[0]}
               </p>
               <Slider value={topN} onValueChange={setTopN} min={1} max={50} step={1} />
             </div>
@@ -264,19 +264,19 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
               <BarChart3 className="h-6 w-6 text-accent" aria-hidden="true" />
             </div>
-            <h3 className="font-semibold text-foreground">Statistics</h3>
+            <h3 className="font-semibold text-foreground">Статистика</h3>
             <div className="mt-2 grid w-full grid-cols-3 gap-2 text-center">
               <div>
                 <p className="text-lg font-bold text-primary">{stats.total}</p>
-                <p className="text-[10px] text-muted-foreground">Total</p>
+                <p className="text-[10px] text-muted-foreground">Всего</p>
               </div>
               <div>
                 <p className="text-lg font-bold text-foreground">{stats.avgScore}</p>
-                <p className="text-[10px] text-muted-foreground">Avg Score</p>
+                <p className="text-[10px] text-muted-foreground">Средний Score</p>
               </div>
               <div>
                 <p className="text-lg font-bold text-accent">{stats.maxScore}</p>
-                <p className="text-[10px] text-muted-foreground">Max Score</p>
+                <p className="text-[10px] text-muted-foreground">Макс. Score</p>
               </div>
             </div>
           </CardContent>
@@ -289,7 +289,7 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
           <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Trophy className="h-4 w-4" style={{ color: "hsl(32 85% 48%)" }} aria-hidden="true" />
-              Top {topN[0]} Combinations by Score
+              Лучшие {topN[0]} комбинаций по Score
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -336,10 +336,10 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
 
             {/* Detail Viewer */}
             <div className="mt-4 flex flex-col gap-2">
-              <p className="text-xs font-medium text-muted-foreground">View combination details (JSON)</p>
+              <p className="text-xs font-medium text-muted-foreground">Просмотр деталей комбинации (JSON)</p>
               <Select value={selectedCombo} onValueChange={setSelectedCombo}>
                 <SelectTrigger className="bg-card text-foreground">
-                  <SelectValue placeholder="Select a combination..." />
+                  <SelectValue placeholder="Выберите комбинацию..." />
                 </SelectTrigger>
                 <SelectContent>
                   {topCombinations.map((c) => (
@@ -364,14 +364,14 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Sparkles className="h-4 w-4 text-accent" aria-hidden="true" />
-            MCDA Insights
+            Данные MCDA
           </CardTitle>
         </CardHeader>
         <CardContent>
           {mcdaLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading advanced analytics...
+              Загрузка расширенной аналитики...
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -383,15 +383,15 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
               <div className="grid gap-4 xl:grid-cols-3">
                 <div className="rounded-lg border border-border bg-background/70 p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">AHP weights</p>
-                    <span className="text-xs text-muted-foreground">{mcdaData.ahp?.is_consistent ? "Consistent" : "Review"}</span>
+                    <p className="text-sm font-semibold text-foreground">Веса МАИ</p>
+                    <span className="text-xs text-muted-foreground">{mcdaData.ahp?.is_consistent ? "Согласовано" : "Проверить"}</span>
                   </div>
                   {mcdaData.ahp ? (
                     <div className="space-y-3">
                       {mcdaData.ahp.weights.map((weight, index) => (
                         <div key={index}>
                           <div className="mb-1 flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Criterion {index + 1}</span>
+                            <span className="text-muted-foreground">Критерий {index + 1}</span>
                             <span className="font-semibold text-foreground">{weight.toFixed(2)}</span>
                           </div>
                           <div className="h-2 w-full rounded-full bg-muted">
@@ -404,19 +404,19 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
                       </p>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">AHP weights unavailable.</p>
+                    <p className="text-sm text-muted-foreground">Веса МАИ недоступны.</p>
                   )}
                 </div>
 
                 <div className="rounded-lg border border-border bg-background/70 p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">Pareto / TOPSIS / ε</p>
-                    <span className="text-xs text-muted-foreground">Adaptive ranking</span>
+                    <p className="text-sm font-semibold text-foreground">Парето / TOPSIS / ε</p>
+                    <span className="text-xs text-muted-foreground">Адаптивное ранжирование</span>
                   </div>
                   <div className="space-y-3 text-sm">
                     {mcdaData.pareto.length > 0 ? (
                       <div>
-                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pareto frontier</p>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Фронт Парето</p>
                         <ul className="space-y-1">
                           {mcdaData.pareto.slice(0, 4).map((item, index) => (
                             <li key={`${getDisplayId(item)}-${index}`} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
@@ -442,7 +442,7 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
                     ) : null}
                     {mcdaData.epsilon.length > 0 ? (
                       <div>
-                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">ε-constraints</p>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">ε-ограничения</p>
                         <ul className="space-y-1">
                           {mcdaData.epsilon.slice(0, 4).map((item, index) => (
                             <li key={`${getDisplayId(item)}-${index}`} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
@@ -458,13 +458,13 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
 
                 <div className="rounded-lg border border-border bg-background/70 p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-foreground">Stability & sensitivity</p>
-                    <span className="text-xs text-muted-foreground">Robustness</span>
+                    <p className="text-sm font-semibold text-foreground">Устойчивость и чувствительность</p>
+                    <span className="text-xs text-muted-foreground">Надёжность</span>
                   </div>
                   <div className="space-y-3 text-sm">
                     {mcdaData.stability ? (
                       <div>
-                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stress test</p>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Стресс-тест</p>
                         <ul className="space-y-1">
                           {Object.entries(mcdaData.stability).slice(0, 4).map(([id, value]) => (
                             <li key={id} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
@@ -477,12 +477,12 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
                     ) : null}
                     {mcdaData.sensitivity ? (
                       <div>
-                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Uncertainty</p>
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Неопределённость</p>
                         <ul className="space-y-1">
                           {Object.entries(mcdaData.sensitivity).slice(0, 4).map(([id, value]) => (
                             <li key={id} className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
                               <span className="font-mono text-xs">{id}</span>
-                              <span className="text-muted-foreground">{value.flags.length > 0 ? "Check" : "Stable"}</span>
+                              <span className="text-muted-foreground">{value.flags.length > 0 ? "Проверить" : "Стабильно"}</span>
                             </li>
                           ))}
                         </ul>
@@ -501,13 +501,13 @@ export function AnalysisPage({ data, showNotification, onSynthesizeCombinations 
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <BarChart3 className="h-4 w-4 text-primary" aria-hidden="true" />
-            Score Distribution
+            Распределение Score
           </CardTitle>
         </CardHeader>
         <CardContent>
           {data.combinations.length === 0 ? (
             <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <p className="text-sm">No combinations to visualize. Run synthesis first.</p>
+              <p className="text-sm">Нет комбинаций для визуализации. Сначала запустите синтез.</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={320}>

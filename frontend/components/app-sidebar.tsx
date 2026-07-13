@@ -31,10 +31,10 @@ interface AppSidebarProps {
 }
 
 const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
-  { id: "data_entry", label: "Data Entry", icon: FlaskConical },
-  { id: "database", label: "Database", icon: Database },
-  { id: "analysis", label: "Analysis", icon: BarChart3 },
-  { id: "export", label: "Export", icon: Download },
+  { id: "data_entry", label: "Ввод данных", icon: FlaskConical },
+  { id: "database", label: "База данных", icon: Database },
+  { id: "analysis", label: "Анализ", icon: BarChart3 },
+  { id: "export", label: "Экспорт", icon: Download },
 ]
 
 function SidebarContent({
@@ -56,7 +56,7 @@ function SidebarContent({
           <h1 className="text-sm font-bold text-sidebar-accent-foreground">
             BioSensor
           </h1>
-          <p className="text-xs text-sidebar-foreground/60">Passport Manager</p>
+            <p className="text-xs text-sidebar-foreground/60">Менеджер паспортов</p>
         </div>
       </div>
 
@@ -65,7 +65,7 @@ function SidebarContent({
       <ScrollArea className="flex-1 px-3 py-4">
         {/* File Section */}
         <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
-          File
+          Файл
         </p>
         <div className="mb-4 flex gap-2">
           <Button
@@ -75,7 +75,7 @@ function SidebarContent({
             onClick={() => { onSave?.(); onItemClick?.() }}
           >
             <Save className="h-4 w-4" aria-hidden="true" />
-            Save
+            Сохранить
           </Button>
           <Button
             variant="ghost"
@@ -84,7 +84,7 @@ function SidebarContent({
             onClick={() => { onLoad?.(); onItemClick?.() }}
           >
             <FolderOpen className="h-4 w-4" aria-hidden="true" />
-            Load
+            Загрузить
           </Button>
         </div>
 
@@ -92,7 +92,7 @@ function SidebarContent({
 
         {/* Navigation */}
         <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
-          Navigation
+          Навигация
         </p>
         <nav className="mb-4 flex flex-col gap-1">
           {navItems.map((item) => {
@@ -121,7 +121,7 @@ function SidebarContent({
 
         {/* Tools */}
         <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
-          Tools
+          Инструменты
         </p>
         <div className="flex gap-2">
           <Button
@@ -131,7 +131,7 @@ function SidebarContent({
             onClick={() => { onClear?.(); onItemClick?.() }}
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
-            Clear
+            Очистить
           </Button>
           <Button
             variant="ghost"
@@ -140,7 +140,7 @@ function SidebarContent({
             onClick={() => { onExport?.(); onItemClick?.() }}
           >
             <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
-            Export
+            Экспорт
           </Button>
         </div>
       </ScrollArea>
@@ -148,7 +148,7 @@ function SidebarContent({
       <Separator className="bg-sidebar-border" />
       <div className="px-5 py-3">
         <p className="text-xs text-sidebar-foreground/40">
-          v1.0.0 &middot; Memristive Biosensor
+          v1.0.0 &middot; Мемристивный биосенсор
         </p>
       </div>
     </div>
@@ -172,7 +172,7 @@ export function AppSidebar(props: AppSidebarProps) {
             variant="ghost"
             size="icon"
             className="fixed left-3 top-3 z-50 h-10 w-10 min-h-[44px] min-w-[44px] rounded-lg bg-card shadow-md md:hidden"
-            aria-label="Open navigation menu"
+            aria-label="Открыть меню навигации"
           >
             <Menu className="h-5 w-5 text-foreground" />
           </Button>

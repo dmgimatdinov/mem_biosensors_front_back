@@ -41,74 +41,74 @@ interface ColDef {
 const COLUMN_DEFS: Record<TableName, ColDef[]> = {
   analytes: [
     { key: "ta_id", label: "ID", pinned: true },
-    { key: "ta_name", label: "Name", pinned: true },
-    { key: "ph_min", label: "pH min" },
-    { key: "ph_max", label: "pH max" },
-    { key: "t_max", label: "T max" },
-    { key: "stability", label: "Stability" },
-    { key: "half_life", label: "Half-life" },
-    { key: "power_consumption", label: "Power" },
+    { key: "ta_name", label: "Название", pinned: true },
+    { key: "ph_min", label: "pH мин" },
+    { key: "ph_max", label: "pH макс" },
+    { key: "t_max", label: "T макс" },
+    { key: "stability", label: "Стабильность" },
+    { key: "half_life", label: "Период полураспада" },
+    { key: "power_consumption", label: "Энергопотребление" },
   ],
   bioRecognitions: [
     { key: "bre_id", label: "ID", pinned: true },
-    { key: "bre_name", label: "Name", pinned: true },
-    { key: "ph_min", label: "pH min" },
-    { key: "ph_max", label: "pH max" },
-    { key: "sensitivity", label: "Sensitivity" },
-    { key: "reproducibility", label: "Reprod." },
-    { key: "t_min", label: "T min" },
-    { key: "t_max", label: "T max" },
-    { key: "dr_min", label: "DR min" },
-    { key: "dr_max", label: "DR max" },
-    { key: "response_time", label: "Resp. time" },
-    { key: "stability", label: "Stability" },
+    { key: "bre_name", label: "Название", pinned: true },
+    { key: "ph_min", label: "pH мин" },
+    { key: "ph_max", label: "pH макс" },
+    { key: "sensitivity", label: "Чувствительность" },
+    { key: "reproducibility", label: "Воспр." },
+    { key: "t_min", label: "T мин" },
+    { key: "t_max", label: "T макс" },
+    { key: "dr_min", label: "DR мин" },
+    { key: "dr_max", label: "DR макс" },
+    { key: "response_time", label: "Время откл." },
+    { key: "stability", label: "Стабильность" },
     { key: "lod", label: "LOD" },
-    { key: "durability", label: "Durability" },
-    { key: "power_consumption", label: "Power" },
+    { key: "durability", label: "Долговечность" },
+    { key: "power_consumption", label: "Энергопотребление" },
   ],
   immobilizations: [
     { key: "im_id", label: "ID", pinned: true },
-    { key: "im_name", label: "Name", pinned: true },
-    { key: "ph_min", label: "pH min" },
-    { key: "ph_max", label: "pH max" },
-    { key: "adhesion", label: "Adhesion" },
-    { key: "young_modulus", label: "Young mod." },
-    { key: "solubility", label: "Solubility" },
-    { key: "loss_coefficient", label: "Loss coeff." },
-    { key: "t_min", label: "T min" },
-    { key: "t_max", label: "T max" },
-    { key: "reproducibility", label: "Reprod." },
-    { key: "response_time", label: "Resp. time" },
-    { key: "stability", label: "Stability" },
-    { key: "durability", label: "Durability" },
-    { key: "power_consumption", label: "Power" },
+    { key: "im_name", label: "Название", pinned: true },
+    { key: "ph_min", label: "pH мин" },
+    { key: "ph_max", label: "pH макс" },
+    { key: "adhesion", label: "Адгезия" },
+    { key: "young_modulus", label: "Модуль Юнга" },
+    { key: "solubility", label: "Растворимость" },
+    { key: "loss_coefficient", label: "Коэф. потерь" },
+    { key: "t_min", label: "T мин" },
+    { key: "t_max", label: "T макс" },
+    { key: "reproducibility", label: "Воспр." },
+    { key: "response_time", label: "Время откл." },
+    { key: "stability", label: "Стабильность" },
+    { key: "durability", label: "Долговечность" },
+    { key: "power_consumption", label: "Энергопотребление" },
   ],
   memristives: [
     { key: "mem_id", label: "ID", pinned: true },
-    { key: "mem_name", label: "Name", pinned: true },
-    { key: "ph_min", label: "pH min" },
-    { key: "ph_max", label: "pH max" },
-    { key: "sensitivity", label: "Sensitivity" },
-    { key: "young_modulus", label: "Young mod." },
-    { key: "reproducibility", label: "Reprod." },
-    { key: "t_min", label: "T min" },
-    { key: "t_max", label: "T max" },
-    { key: "dr_min", label: "DR min" },
-    { key: "dr_max", label: "DR max" },
-    { key: "response_time", label: "Resp. time" },
-    { key: "stability", label: "Stability" },
+    { key: "mem_name", label: "Название", pinned: true },
+    { key: "ph_min", label: "pH мин" },
+    { key: "ph_max", label: "pH макс" },
+    { key: "sensitivity", label: "Чувствительность" },
+    { key: "young_modulus", label: "Модуль Юнга" },
+    { key: "reproducibility", label: "Воспр." },
+    { key: "t_min", label: "T мин" },
+    { key: "t_max", label: "T макс" },
+    { key: "dr_min", label: "DR мин" },
+    { key: "dr_max", label: "DR макс" },
+    { key: "response_time", label: "Время откл." },
+    { key: "stability", label: "Стабильность" },
     { key: "lod", label: "LOD" },
-    { key: "durability", label: "Durability" },
-    { key: "power_consumption", label: "Power" },
+    { key: "durability", label: "Долговечность" },
+    { key: "power_consumption", label: "Энергопотребление" },
   ],
   combinations: [
     { key: "id", label: "ID", pinned: true },
-    { key: "ta_id", label: "Analyte" },
+    { key: "ta_id", label: "Аналит" },
     { key: "bre_id", label: "BRE" },
     { key: "im_id", label: "IM" },
     { key: "mem_id", label: "MEM" },
     { key: "score", label: "Score" },
-    { key: "createdAt", label: "Created" },
+    { key: "createdAt", label: "Создано" },
   ],
 }
 
@@ -186,15 +186,15 @@ function ColumnNav({ currentGroup, totalGroups, scrollableCols, groupSize, onPre
         aria-label="Previous column group"
       >
         <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-        <span className="hidden sm:inline">Prev</span>
+        <span className="hidden sm:inline">Назад</span>
       </Button>
 
       <div className="flex flex-col items-center gap-0.5">
         <span className="text-xs font-medium text-foreground">
-          Group {currentGroup + 1}/{totalGroups}
+          Группа {currentGroup + 1}/{totalGroups}
         </span>
         <span className="text-[10px] text-muted-foreground">
-          columns {startCol}-{endCol} of {scrollableCols.length}
+          столбцы {startCol}-{endCol} из {scrollableCols.length}
         </span>
       </div>
 
@@ -275,9 +275,9 @@ export function DatabasePage({ data }: DatabasePageProps) {
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">Database</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">База данных</h2>
         <p className="text-sm text-muted-foreground">
-          Browse and manage biosensor data tables
+          Просмотр и управление таблицами данных биосенсоров
         </p>
       </div>
 
@@ -300,11 +300,11 @@ export function DatabasePage({ data }: DatabasePageProps) {
               <Database className="h-4 w-4 text-primary" aria-hidden="true" />
               {TABLE_LABELS[activeTable]}
               <Badge variant="secondary" className="ml-1 text-xs font-normal">
-                {tableData.length} rows
+                {tableData.length} строк
               </Badge>
             </CardTitle>
             <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
-              {allColDefs.length} columns
+              {allColDefs.length} столбцов
             </Badge>
           </div>
         </CardHeader>
@@ -315,7 +315,7 @@ export function DatabasePage({ data }: DatabasePageProps) {
           ) : tableData.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Database className="mb-3 h-10 w-10 opacity-40" aria-hidden="true" />
-              <p className="text-sm">No data in this table yet</p>
+              <p className="text-sm">В этой таблице пока нет данных</p>
             </div>
           ) : (
             <>

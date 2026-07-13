@@ -44,17 +44,17 @@ export default function Page() {
   const handleSidebarSave = useCallback(() => {
     // Refresh data from server (backend auto-saves)
     refetch()
-    showNotification("Data refreshed from server", "success")
+    showNotification("Данные обновлены с сервера", "success")
   }, [refetch, showNotification])
 
   const handleSidebarLoad = useCallback(() => {
     // Refresh data from server
     refetch()
-    showNotification("Data reloaded from server", "info")
+    showNotification("Данные перезагружены с сервера", "info")
   }, [refetch, showNotification])
 
   const handleSidebarClear = useCallback(() => {
-    showNotification("Navigate to Data Entry to clear the form", "info")
+    showNotification("Перейдите в раздел «Ввод данных» для очистки формы", "info")
     setActiveSection("data_entry")
   }, [showNotification])
 
@@ -68,16 +68,16 @@ export default function Page() {
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3 max-w-md text-center">
           <div className="text-destructive text-4xl">⚠️</div>
-          <h2 className="text-xl font-semibold text-foreground">Connection Error</h2>
+          <h2 className="text-xl font-semibold text-foreground">Ошибка подключения</h2>
           <p className="text-sm text-muted-foreground">{error}</p>
           <p className="text-xs text-muted-foreground mt-2">
-            Make sure the backend server is running at http://localhost:8000
+            Убедитесь, что сервер запущен на http://localhost:8000
           </p>
           <button
             onClick={() => refetch()}
             className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
-            Retry Connection
+            Повторить
           </button>
         </div>
       </div>
@@ -90,7 +90,7 @@ export default function Page() {
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading biosensor data from server...</p>
+          <p className="text-sm text-muted-foreground">Загрузка данных биосенсоров с сервера...</p>
         </div>
       </div>
     )

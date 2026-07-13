@@ -283,9 +283,9 @@ export const TABLE_LABELS: Record<TableName, string> = {
 }
 
 export const TABLE_LABELS_RU: Record<TableName, string> = {
-  analytes: "Analytes (TA)",
-  bioRecognitions: "Bio-Recognition (BRE)",
-  immobilizations: "Immobilization (IM)",
-  memristives: "Memristive (MEM)",
-  combinations: "Combinations",
+  analytes: "Аналиты (TA)",
+  bioRecognitions: "Биораспознающие слои (BRE)",
+  immobilizations: "Иммобилизационные слои (IM)",
+  memristives: "Мемристивные слои (MEM)",
+  combinations: "Комбинации сенсоров",
 }
