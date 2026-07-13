@@ -1,0 +1,88 @@
+name: Build Desktop Portable Bundle
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*-desktop'
+  schedule:
+    - cron: '0 3 * * 1'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('desktop/requirements-desktop.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r desktop/requirements-desktop.txt
+
+      - name: Install Node dependencies
+        run: cd frontend && npm ci
+
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      - name: Build portable bundle
+        run: pyinstaller desktop/mem_biosensors.spec --clean --noconfirm
+
+      - name: Prepare portable folder
+        run: |
+          if not exist dist\mem_biosensors_portable mkdir dist\mem_biosensors_portable
+          xcopy /E /I /Y frontend\out dist\mem_biosensors_portable\frontend\
+          copy desktop\README.md dist\mem_biosensors_portable\README.txt
+          copy desktop\icons\app.ico dist\mem_biosensors_portable\app.ico
+          if exist dist\mem_biosensors_portable\MemBiosensors.exe copy dist\mem_biosensors_portable\MemBiosensors.exe dist\mem_biosensors_portable\mem_biosensors.exe
+
+      - name: Create ZIP archive
+        run: python - <<'PY'
+from pathlib import Path
+import shutil
+import hashlib
+root = Path.cwd()
+dist_dir = root / 'dist' / 'mem_biosensors_portable'
+out_zip = root / 'desktop' / 'dist' / 'MemBiosensors_Portable.zip'
+out_zip.parent.mkdir(parents=True, exist_ok=True)
+shutil.make_archive(str(out_zip.with_suffix('')), 'zip', dist_dir)
+print(f'Created {out_zip}')
+print('SHA256', hashlib.sha256(out_zip.read_bytes()).hexdigest())
+PY
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MemBiosensors_Portable
+          path: desktop/dist/MemBiosensors_Portable.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/dist/MemBiosensors_Portable.zip

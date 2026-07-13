@@ -53,3 +53,14 @@ backend/logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Desktop build artifacts
+desktop/dist/
+desktop/build/
+desktop/*.spec.bak
+desktop/*.zip
+desktop/logs/
+desktop/data/
+*.exe
+!desktop/build.bat
+!desktop/build.sh
