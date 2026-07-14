@@ -2,7 +2,21 @@
 source = backend
 omit =
     backend/tests/*
+    backend/db/migrations.py
+    backend/migrations/*
+    backend/*/migrations/*
+    backend/memristive_biosensor.db
+    backend/desktop/*
+    backend/google_patents_parser/*
+    backend/articles_search/*
 
 [report]
 omit =
     backend/tests/*
+    backend/db/migrations.py
+    backend/migrations/*
+    backend/*/migrations/*
+    backend/memristive_biosensor.db
+    backend/desktop/*
+    backend/google_patents_parser/*
+    backend/articles_search/*
