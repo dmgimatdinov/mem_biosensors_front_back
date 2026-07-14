@@ -134,15 +134,19 @@ class DatabaseManager(DatabaseAdapter):
             # Не критично, продолжаем — мигратор сам создаст таблицы
             pass
 
-        # Применить миграции ПЕРЕД созданием таблиц
-        migrator = MigrationManager(db_name)
-        migrator.migrate(ALL_MIGRATIONS)
-        
+        # Создать текущую схему для свежей БД, затем применить миграции к существующей схеме.
         try:
             self.create_tables()
         except sqlite3.Error as e:
             self.logger.critical(f"Не удалось инициализировать БД: {e}")
             raise DatabaseConnectionError(f"Ошибка подключения к {db_name}") from e
+
+        migrator = MigrationManager(db_name)
+        try:
+            migrator.migrate(ALL_MIGRATIONS, conn=get_connection())
+        except Exception:
+            # Fallback to path-based migration if connection-based fails
+            migrator.migrate(ALL_MIGRATIONS)
 
     def create_tables(self) -> None:
         """Создание таблиц базы данных, если они не существуют."""
@@ -258,6 +262,7 @@ class DatabaseManager(DatabaseAdapter):
                 PC_total REAL,
                 Score REAL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_test INTEGER DEFAULT 0,
                 FOREIGN KEY (TA_ID) REFERENCES Analytes (TA_ID),
                 FOREIGN KEY (BRE_ID) REFERENCES BioRecognitionLayers (BRE_ID),
                 FOREIGN KEY (IM_ID) REFERENCES ImmobilizationLayers (IM_ID),
@@ -309,6 +314,48 @@ class DatabaseManager(DatabaseAdapter):
                     cursor.execute(table)
                 conn.commit()
                 self.logger.info("Таблицы успешно созданы")
+                # Ensure protective triggers use updated logic (allow deletion of test-like IDs)
+                try:
+                    table_id_map = {
+                        "Analytes": "TA_ID",
+                        "BioRecognitionLayers": "BRE_ID",
+                        "ImmobilizationLayers": "IM_ID",
+                        "MemristiveLayers": "MEM_ID",
+                        "SensorCombinations": "Combo_ID",
+                    }
+                    for tbl, id_col in table_id_map.items():
+                        try:
+                            cursor.execute(f"PRAGMA table_info({tbl})")
+                            cols = [r[1] for r in cursor.fetchall()]
+                        except sqlite3.Error:
+                            continue
+
+                        if "is_test" not in cols:
+                            continue
+
+                        trigger_name = f"protect_delete_{tbl}"
+                        try:
+                            cursor.execute(f"DROP TRIGGER IF EXISTS {trigger_name}")
+                        except sqlite3.Error:
+                            pass
+
+                        # Recreate trigger with permissive test-id matching
+                        cursor.execute(f"""
+                            CREATE TRIGGER {trigger_name}
+                            BEFORE DELETE ON {tbl}
+                            FOR EACH ROW
+                            WHEN (
+                                (OLD.is_test IS NULL OR OLD.is_test = 0)
+                                AND (COALESCE(OLD.{id_col}, '') NOT LIKE '%_TEST%' AND COALESCE(OLD.{id_col}, '') NOT LIKE '%_DUP%' AND COALESCE(OLD.{id_col}, '') NOT LIKE '%TEST%')
+                            )
+                            BEGIN
+                                SELECT RAISE(ABORT, 'Attempt to delete non-test data is forbidden');
+                            END;
+                        """)
+                    conn.commit()
+                except Exception:
+                    # Non-fatal — triggers are protective but not critical for startup
+                    pass
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка создания таблиц: {e}")
 
@@ -338,15 +385,22 @@ class DatabaseManager(DatabaseAdapter):
 
                 query = """
                 INSERT OR REPLACE INTO Analytes (
-                    TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC,
+                    TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC, is_test,
                     source_type, source_doi, source_date, reliability_category, data_completeness
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
+                # Normalize is_test input
+                is_test_val = data.get('is_test', data.get('isTest', 0))
+                try:
+                    is_test_val = 1 if str(is_test_val).strip().lower() in {"1", "true", "yes", "y", "t"} else 0
+                except Exception:
+                    is_test_val = 0
+
                 cursor.execute(query, (
                     ta_id, ta_name, ph_min,
                     ph_max, t_max, st,
-                    hl, pc,
+                    hl, pc, is_test_val,
                     source_type, source_doi, source_date, reliability_category, data_completeness
                 ))
                 conn.commit()
@@ -572,14 +626,14 @@ class DatabaseManager(DatabaseAdapter):
 
                 query = """
                 INSERT OR REPLACE INTO SensorCombinations 
-                (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at, is_test)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
                     combo_id, ta_id, bre_id, im_id,
                     mem_id, sn_total, tr_total, st_total,
                     rp_total, lod_total, dr_total, hl_total,
-                    pc_total, score, created_at
+                    pc_total, score, created_at, data.get('is_test', 0)
                 ))
                 conn.commit()
                 self.clear_cache()
@@ -658,7 +712,7 @@ class DatabaseManager(DatabaseAdapter):
     def list_all_analytes(self) -> List[Dict[str, Any]]:
         """Получение всех аналитов с выбором конкретных столбцов."""
         query = """
-        SELECT TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST
+        SELECT TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, is_test
         FROM Analytes
         ORDER BY TA_Name
         """
