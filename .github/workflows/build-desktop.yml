@@ -82,16 +82,7 @@ jobs:
             cp dist/mem_biosensors_portable/MemBiosensors.exe dist/mem_biosensors_portable/mem_biosensors.exe
           fi
           printf 'SHA256 for the archive will be generated in the next step.\n' > dist/mem_biosensors_portable/SHA256SUMS.txt
-          python - <<'PY'
-from pathlib import Path
-import shutil
-root = Path.cwd()
-dist_dir = root / 'dist' / 'mem_biosensors_portable'
-out_zip = root / 'desktop' / 'dist' / f"MemBiosensors_Portable_v{(Path('desktop/VERSION').read_text().strip() if Path('desktop/VERSION').exists() else '1.0.0')}_win-x64.zip"
-out_zip.parent.mkdir(parents=True, exist_ok=True)
-shutil.make_archive(str(out_zip.with_suffix('')), 'zip', dist_dir)
-print(f'Created {out_zip}')
-PY
+          python -c "from pathlib import Path; import shutil; root = Path.cwd(); dist_dir = root / 'dist' / 'mem_biosensors_portable'; out_zip = root / 'desktop' / 'dist' / f\"MemBiosensors_Portable_v{(Path('desktop/VERSION').read_text().strip() if Path('desktop/VERSION').exists() else '1.0.0')}_win-x64.zip\"; out_zip.parent.mkdir(parents=True, exist_ok=True); shutil.make_archive(str(out_zip.with_suffix('')), 'zip', dist_dir); print(f'Created {out_zip}')"
 
       - name: Verify artifact
         shell: bash
@@ -102,14 +93,7 @@ PY
       - name: Compute SHA256
         shell: bash
         run: |
-          python - <<'PY'
-from pathlib import Path
-import hashlib
-archive = next(Path('desktop/dist').glob('MemBiosensors_Portable_v*_win-x64.zip'))
-sha = hashlib.sha256(archive.read_bytes()).hexdigest()
-Path('desktop/dist/sha256.txt').write_text(f'{sha}  {archive.name}\n', encoding='utf-8')
-print(sha)
-PY
+          python -c "from pathlib import Path; import hashlib; archive = next(Path('desktop/dist').glob('MemBiosensors_Portable_v*_win-x64.zip')); sha = hashlib.sha256(archive.read_bytes()).hexdigest(); Path('desktop/dist/sha256.txt').write_text(f'{sha}  {archive.name}\\n', encoding='utf-8'); print(sha)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
