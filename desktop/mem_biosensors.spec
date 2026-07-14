@@ -1,7 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 
-root = Path(__file__).resolve().parent.parent
+# SPECPATH is provided by PyInstaller and points to the directory
+# containing this .spec file.
+root = Path(SPECPATH).resolve().parent
 
 block_cipher = None
 
