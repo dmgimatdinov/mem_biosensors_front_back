@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 import os
 import secrets
@@ -27,6 +28,14 @@ FRONTEND_DIR = BUNDLE_DIR / "frontend"
 ASSETS_DIR = BUNDLE_DIR / "assets"
 BANNER_PATH = ASSETS_DIR / "banner.txt"
 JWT_SECRET_FILE = DATA_DIR / ".jwt_secret"
+
+
+def _ensure_standard_streams() -> None:
+    """Ensure sys.stdout and sys.stderr are valid objects in packaged runs."""
+    if sys.stdout is None:
+        sys.stdout = io.StringIO()
+    if sys.stderr is None:
+        sys.stderr = io.StringIO()
 
 
 def ensure_runtime_dirs() -> None:
@@ -143,6 +152,7 @@ def prepare_import_paths() -> None:
 
 def main() -> int:
     """Launch the FastAPI backend and open the UI in the browser."""
+    _ensure_standard_streams()
     initialize_environment()
     prepare_import_paths()
 
@@ -161,6 +171,7 @@ def main() -> int:
             port=port,
             log_level="info",
             access_log=False,
+            log_config=None,
         )
     except KeyboardInterrupt:
         LOGGER.info("Server stopped by user")

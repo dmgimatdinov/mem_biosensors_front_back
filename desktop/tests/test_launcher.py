@@ -1,6 +1,7 @@
 """Tests for the portable launcher helpers."""
 
 import importlib.util
+import io
 import sys
 from pathlib import Path
 
@@ -33,6 +34,28 @@ def clean_environment(monkeypatch):
     monkeypatch.delenv("LOG_LEVEL", raising=False)
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     monkeypatch.delenv("UVICORN_RELOAD", raising=False)
+
+
+def test_ensure_standard_streams_handles_none(monkeypatch):
+    monkeypatch.setattr(sys, "stdout", None, raising=False)
+    monkeypatch.setattr(sys, "stderr", None, raising=False)
+
+    launcher_module._ensure_standard_streams()
+
+    assert sys.stdout is not None
+    assert sys.stderr is not None
+    assert isinstance(sys.stdout, io.StringIO)
+    assert isinstance(sys.stderr, io.StringIO)
+
+
+def test_ensure_standard_streams_preserves_existing_streams():
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+
+    launcher_module._ensure_standard_streams()
+
+    assert sys.stdout is original_stdout
+    assert sys.stderr is original_stderr
 
 
 def test_find_free_port_returns_open_port(tmp_path):
