@@ -69,3 +69,11 @@ desktop/data/
 portable-frontend/dist/
 portable-frontend/*.zip
 portable-frontend/logs/
+
+
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+MemBiosensors_Portable_v1.0.0_win-x64.zip
+MemBiosensors_Portable_v1.0.0_win/
+repomix-output.xml
