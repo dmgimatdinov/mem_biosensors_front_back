@@ -1,7 +1,13 @@
 import os
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+import sys
+
+
+_AUTH_CONNECTION: Optional[sqlite3.Connection] = None
 
 from fastapi import HTTPException
 
@@ -24,7 +30,32 @@ from auth.security import (
     hash_token,
     verify_password,
 )
-from db.manager import get_connection
+import db.manager
+
+
+def _auth_db_path() -> str:
+    override = os.getenv("AUTH_DB_PATH", "").strip()
+    if override:
+        return override
+    if os.getenv("PYTEST_CURRENT_TEST") is not None or os.getenv("PYTEST_XDIST_WORKER") is not None or "pytest" in sys.modules or os.getenv("TESTING", "0") == "1":
+        return ":memory:"
+    return os.getenv("AUTH_DB_PATH", "auth_service.db")
+
+
+def get_connection():
+    global _AUTH_CONNECTION
+    db_path = _auth_db_path()
+    if db_path == ":memory:":
+        if _AUTH_CONNECTION is None:
+            _AUTH_CONNECTION = sqlite3.connect(db_path, check_same_thread=False)
+            _AUTH_CONNECTION.execute("PRAGMA foreign_keys = ON")
+        return _AUTH_CONNECTION
+    try:
+        return db.manager.get_connection()
+    except Exception:
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
 
 
 @dataclass

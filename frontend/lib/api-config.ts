@@ -35,6 +35,12 @@ export const API_ENDPOINTS = {
   analyticsStatistics: "/api/analytics/statistics",
   analyticsBestCombinations: "/api/analytics/best-combinations",
   analyticsComparative: "/api/analytics/comparative",
+  analyticsAHP: "/api/analytics/ahp",
+  analyticsPareto: "/api/analytics/pareto",
+  analyticsTopsis: "/api/analytics/topsis",
+  analyticsEpsilonConstraints: "/api/analytics/epsilon-constraints",
+  analyticsStability: "/api/analytics/stability",
+  analyticsSensitivity: "/api/analytics/sensitivity",
   
   // Export
   exportTable: (tableName: string, format: string) => `/api/export/${tableName}?format=${format}`,

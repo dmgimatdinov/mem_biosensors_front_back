@@ -71,7 +71,7 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
   const handleExportSingle = useCallback(() => {
     const tableData = getTableDataArray(data, selectedTable)
     if (tableData.length === 0) {
-      showNotification("No data to export in this table", "warning")
+      showNotification("В этой таблице нет данных для экспорта", "warning")
       return
     }
 
@@ -82,7 +82,7 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
       const json = JSON.stringify(tableData, null, 2)
       downloadFile(`${selectedTable}.json`, json, "application/json")
     }
-    showNotification(`Exported ${selectedTable} as ${format.toUpperCase()}`, "success")
+    showNotification(`Экспортировано: ${selectedTable} в формате ${format.toUpperCase()}`, "success")
   }, [data, selectedTable, format, showNotification])
 
   const handleExportAll = useCallback(() => {
@@ -104,15 +104,15 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
       const json = JSON.stringify(allData, null, 2)
       downloadFile("biosensor_all_data.json", json, "application/json")
     }
-    showNotification(`Exported all tables as ${format.toUpperCase()}`, "success")
+    showNotification(`Все таблицы экспортированы в формате ${format.toUpperCase()}`, "success")
   }, [data, format, showNotification])
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">Export Data</h2>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">Экспорт данных</h2>
         <p className="text-sm text-muted-foreground">
-          Export your biosensor data to CSV or JSON format
+          Экспорт данных биосенсоров в формат CSV или JSON
         </p>
       </div>
 
@@ -122,7 +122,7 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <Archive className="h-4 w-4 text-primary" aria-hidden="true" />
-              What to export
+              Что экспортировать
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -130,15 +130,15 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
               <div className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
                 <RadioGroupItem value="single" id="single" />
                 <Label htmlFor="single" className="cursor-pointer text-foreground">
-                  <span className="font-medium">Single table</span>
-                  <span className="block text-xs text-muted-foreground">Export one specific table</span>
+                  <span className="font-medium">Одна таблица</span>
+                  <span className="block text-xs text-muted-foreground">Экспорт одной конкретной таблицы</span>
                 </Label>
               </div>
               <div className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
                 <RadioGroupItem value="all" id="all" />
                 <Label htmlFor="all" className="cursor-pointer text-foreground">
-                  <span className="font-medium">All tables</span>
-                  <span className="block text-xs text-muted-foreground">Export everything at once</span>
+                  <span className="font-medium">Все таблицы</span>
+                  <span className="block text-xs text-muted-foreground">Экспорт всего сразу</span>
                 </Label>
               </div>
             </RadioGroup>
@@ -150,7 +150,7 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
-              Format
+              Формат
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -161,7 +161,7 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
                   <FileText className="h-4 w-4 text-accent" aria-hidden="true" />
                   <span>
                     <span className="font-medium">CSV</span>
-                    <span className="block text-xs text-muted-foreground">Comma-separated values, compatible with Excel</span>
+                    <span className="block text-xs text-muted-foreground">Значения через запятую, совместимо с Excel</span>
                   </span>
                 </Label>
               </div>
@@ -171,7 +171,7 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
                   <FileJson className="h-4 w-4 text-primary" aria-hidden="true" />
                   <span>
                     <span className="font-medium">JSON</span>
-                    <span className="block text-xs text-muted-foreground">Structured data format, ideal for APIs</span>
+                    <span className="block text-xs text-muted-foreground">Структурированный формат, идеален для API</span>
                   </span>
                 </Label>
               </div>
@@ -186,7 +186,7 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
           {exportScope === "single" ? (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Select table</Label>
+                <Label className="text-xs font-medium text-muted-foreground">Выберите таблицу</Label>
                 <Select value={selectedTable} onValueChange={(v) => setSelectedTable(v as TableName)}>
                   <SelectTrigger className="bg-card text-foreground">
                     <SelectValue />
@@ -206,31 +206,30 @@ export function ExportPage({ data, showNotification }: ExportPageProps) {
                     {TABLE_LABELS[selectedTable]}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {getTableDataArray(data, selectedTable).length} records available
+                    {getTableDataArray(data, selectedTable).length} доступно записей
                   </p>
                 </div>
                 <Button onClick={handleExportSingle} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
                   <Download className="h-4 w-4" aria-hidden="true" />
-                  Export {format.toUpperCase()}
+                  Экспорт {format.toUpperCase()}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
               <div>
-                <p className="text-sm font-medium text-foreground">All Tables</p>
+                <p className="text-sm font-medium text-foreground">Все таблицы</p>
                 <p className="text-xs text-muted-foreground">
-                  {Object.keys(TABLE_LABELS).length} tables with{" "}
+                  {Object.keys(TABLE_LABELS).length} таблиц, всего записей: {" "}
                   {(Object.keys(TABLE_LABELS) as TableName[]).reduce(
                     (sum, key) => sum + getTableDataArray(data, key).length,
                     0
-                  )}{" "}
-                  total records
+                  )}
                 </p>
               </div>
               <Button onClick={handleExportAll} className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
                 <Download className="h-4 w-4" aria-hidden="true" />
-                Export All {format.toUpperCase()}
+                Экспорт всех в {format.toUpperCase()}
               </Button>
             </div>
           )}

@@ -23,7 +23,7 @@ class CombinationSynthesisService:
         self.db = db
         self.compatibility_v2 = CompatibilityEngineV2()
     
-    def synthesize_all_combinations(self, max_combinations: int = 10000) -> Tuple[int, int]:
+    def synthesize_all_combinations(self, max_combinations: int = 10000) -> Dict[str, int]:
         """
         Синтез всех совместимых комбинаций.
         
@@ -33,10 +33,10 @@ class CombinationSynthesisService:
         Returns:
             (total_checked, successfully_created)
         """
-        analytes = self.db.list_all_analytes()
-        bio_layers = self.db.list_all_bio_recognition_layers()
-        immob_layers = self.db.list_all_immobilization_layers()
-        mem_layers = self.db.list_all_memristive_layers()
+        analytes = [record for record in self.db.list_all_analytes() if not self._is_test_record(record)]
+        bio_layers = [record for record in self.db.list_all_bio_recognition_layers() if not self._is_test_record(record)]
+        immob_layers = [record for record in self.db.list_all_immobilization_layers() if not self._is_test_record(record)]
+        mem_layers = [record for record in self.db.list_all_memristive_layers() if not self._is_test_record(record)]
         
         total_possible = len(analytes) * len(bio_layers) * len(immob_layers) * len(mem_layers)
         
@@ -65,8 +65,8 @@ class CombinationSynthesisService:
                             )
                             if result:
                                 successfully_created += 1
-                        except Exception as e:
-                            logger.error(f"Ошибка при создании комбинации: {e}")
+                        except Exception:
+                            logger.exception("Ошибка при создании комбинации")
         
         logger.info(f"Синтез завершён: {total_checked} проверено, {successfully_created} создано")
         return {"checked": total_checked, "created": successfully_created}
@@ -84,6 +84,13 @@ class CombinationSynthesisService:
         Returns:
             True если комбинация создана, False иначе
         """
+        if any(
+            self._is_test_record(record)
+            for record in (analyte, bio_layer, immob_layer, mem_layer)
+        ):
+            logger.debug("Пропускаем комбинацию с тестовым элементом")
+            return False
+
         analyte = self._normalize_record(analyte, "analyte")
         bio_layer = self._normalize_record(bio_layer, "bio")
         immob_layer = self._normalize_record(immob_layer, "immob")
@@ -158,6 +165,13 @@ class CombinationSynthesisService:
         application_profile: str = "PoC",
     ) -> bool:
         """Создание комбинации через новый CompatibilityEngineV2."""
+        if any(
+            self._is_test_record(record)
+            for record in (analyte, bio_layer, immob_layer, mem_layer)
+        ):
+            logger.debug("Пропускаем комбинацию v2 с тестовым элементом")
+            return False
+
         analyte = self._normalize_record(analyte, "analyte")
         bio_layer = self._normalize_record(bio_layer, "bio")
         immob_layer = self._normalize_record(immob_layer, "immob")
@@ -233,10 +247,10 @@ class CombinationSynthesisService:
         application_profile: str = "PoC",
     ) -> Dict[str, int]:
         """Синтез комбинаций через CompatibilityEngineV2."""
-        analytes = self.db.list_all_analytes()
-        bio_layers = self.db.list_all_bio_recognition_layers()
-        immob_layers = self.db.list_all_immobilization_layers()
-        mem_layers = self.db.list_all_memristive_layers()
+        analytes = [record for record in self.db.list_all_analytes() if not self._is_test_record(record)]
+        bio_layers = [record for record in self.db.list_all_bio_recognition_layers() if not self._is_test_record(record)]
+        immob_layers = [record for record in self.db.list_all_immobilization_layers() if not self._is_test_record(record)]
+        mem_layers = [record for record in self.db.list_all_memristive_layers() if not self._is_test_record(record)]
 
         total_checked = 0
         successfully_created = 0
@@ -249,22 +263,37 @@ class CombinationSynthesisService:
                             return {"checked": total_checked, "created": successfully_created}
 
                         total_checked += 1
-                        if self.create_combination_v2(
-                            analyte,
-                            bio_layer,
-                            immob_layer,
-                            mem_layer,
-                            application_profile=application_profile,
-                        ):
-                            successfully_created += 1
+                        try:
+                            if self.create_combination_v2(
+                                analyte,
+                                bio_layer,
+                                immob_layer,
+                                mem_layer,
+                                application_profile=application_profile,
+                            ):
+                                successfully_created += 1
+                        except Exception:
+                            logger.exception("Ошибка при создании комбинации v2")
 
         return {"checked": total_checked, "created": successfully_created}
     
     @staticmethod
+    def _is_test_record(record: Dict[str, Any]) -> bool:
+        if not record:
+            return False
+        if isinstance(record.get("is_test"), (int, float)):
+            return int(record["is_test"]) == 1
+        if isinstance(record.get("is_test"), str):
+            return record["is_test"].strip().lower() in {"1", "true", "yes", "y"}
+
+        record_id = str(record.get("TA_ID") or record.get("ta_id") or record.get("BRE_ID") or record.get("bre_id") or record.get("IM_ID") or record.get("im_id") or record.get("MEM_ID") or record.get("mem_id") or "")
+        if not record_id:
+            return False
+        return record_id.endswith("_TEST") or record_id.endswith("_DUP")
+
+    @staticmethod
     def _normalize_record(record: Dict[str, Any], kind: str) -> Dict[str, Any]:
-        normalized = {}
-        for key, value in record.items():
-            normalized[key] = value
+        normalized = dict(record)
 
         aliases = {
             "analyte": {
@@ -374,7 +403,13 @@ class CombinationSynthesisService:
         score = 0.0
         
         for metric_name, weight in weights.items():
-            value = metrics.get(f'{metric_name}_total', 0)
+            raw_value = metrics.get(f'{metric_name}_total', 0)
+            if raw_value is None:
+                raw_value = 0.0
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                value = 0.0
             normalized = normalizer.normalize(value, metric_name)
             score += normalized * weight
         

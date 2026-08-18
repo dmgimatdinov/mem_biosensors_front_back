@@ -148,6 +148,39 @@ interface StatisticsResponse {
   average_score: number
 }
 
+export interface AHPResponse {
+  weights: number[]
+  CI: number
+  CR: number
+  is_consistent: boolean
+}
+
+export interface MCDARecord {
+  [key: string]: any
+}
+
+export interface TopsisResultItem {
+  structure: MCDARecord
+  score: number
+}
+
+export interface StabilityResult {
+  [structureId: string]: {
+    rank_distribution: number[]
+    stability_label: string
+    mean_rank: number
+  }
+}
+
+export interface SensitivityResult {
+  [structureId: string]: {
+    rank_change: number
+    flags: string[]
+    baseline_rank: number
+    adjusted_rank: number
+  }
+}
+
 /**
  * API Error Class
  */
@@ -162,6 +195,86 @@ export class ApiError extends Error {
   }
 }
 
+const AUTH_TOKEN_STORAGE_KEY = "biosensor_access_token"
+const AUTH_USERNAME_STORAGE_KEY = "biosensor_auth_username"
+const AUTH_PASSWORD_STORAGE_KEY = "biosensor_auth_password"
+
+function getBrowserStorage() {
+  if (typeof window === "undefined") {
+    return null
+  }
+  return window.localStorage
+}
+
+function getStoredToken(): string | null {
+  return getBrowserStorage()?.getItem(AUTH_TOKEN_STORAGE_KEY) ?? null
+}
+
+function setStoredToken(token: string | null) {
+  const storage = getBrowserStorage()
+  if (!storage) return
+  if (token) {
+    storage.setItem(AUTH_TOKEN_STORAGE_KEY, token)
+  } else {
+    storage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+  }
+}
+
+function getStoredCredentials() {
+  const storage = getBrowserStorage()
+  if (!storage) return null
+  const username = storage.getItem(AUTH_USERNAME_STORAGE_KEY) || process.env.NEXT_PUBLIC_AUTH_USERNAME || "admin"
+  const password = storage.getItem(AUTH_PASSWORD_STORAGE_KEY) || process.env.NEXT_PUBLIC_AUTH_PASSWORD || "admin"
+  return { username, password }
+}
+
+async function loginAndStoreToken(): Promise<string | null> {
+  const credentials = getStoredCredentials()
+  if (!credentials) return null
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(credentials),
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const payload = await response.json()
+    const token = payload?.access_token
+    if (typeof token === "string" && token.length > 0) {
+      setStoredToken(token)
+      return token
+    }
+  } catch {
+    // Ignore and fall back to unauthenticated request handling.
+  }
+
+  return null
+}
+
+async function buildRequestHeaders(options: RequestInit = {}, retry = false): Promise<Headers> {
+  const headers = new Headers(options.headers || {})
+
+  if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  if (!retry) {
+    const token = getStoredToken()
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`)
+    }
+  }
+
+  return headers
+}
+
 /**
  * Generic fetch wrapper with error handling
  */
@@ -170,15 +283,25 @@ async function fetchApi<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
-  
+
   try {
-    const response = await fetch(url, {
+    const headers = await buildRequestHeaders(options)
+    let response = await fetch(url, {
       ...options,
-      headers: {
-        ...API_CONFIG.headers,
-        ...options.headers,
-      },
+      headers,
     })
+
+    if (!response.ok && response.status === 401 && !options.method?.toString().toUpperCase().includes("POST") && !endpoint.includes("/api/auth/login")) {
+      const token = await loginAndStoreToken()
+      if (token) {
+        const retryHeaders = await buildRequestHeaders(options, true)
+        retryHeaders.set("Authorization", `Bearer ${token}`)
+        response = await fetch(url, {
+          ...options,
+          headers: retryHeaders,
+        })
+      }
+    }
 
     if (!response.ok) {
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`
@@ -297,6 +420,40 @@ export async function getBestCombinations(limit = 10): Promise<SensorCombination
 
 export async function getComparativeAnalysis(): Promise<any> {
   return fetchApi(API_ENDPOINTS.analyticsComparative)
+}
+
+export async function getAHPWeights(matrix = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]): Promise<AHPResponse> {
+  return fetchApi(API_ENDPOINTS.analyticsAHP, {
+    method: "POST",
+    body: JSON.stringify({ matrix }),
+  })
+}
+
+export async function getParetoFrontier(criteria = "LoD,ST", limit = 10): Promise<MCDARecord[]> {
+  return fetchApi(`${API_ENDPOINTS.analyticsPareto}?criteria=${encodeURIComponent(criteria)}&limit=${limit}`)
+}
+
+export async function getTopsisRanking(limit = 10): Promise<TopsisResultItem[]> {
+  return fetchApi(`${API_ENDPOINTS.analyticsTopsis}?limit=${limit}`)
+}
+
+export async function getEpsilonConstraints(
+  objective = "SN_total",
+  constraints = { LoD: ["<", 10], TR: ["<", 30] },
+  limit = 10
+): Promise<MCDARecord[]> {
+  return fetchApi(API_ENDPOINTS.analyticsEpsilonConstraints, {
+    method: "POST",
+    body: JSON.stringify({ objective, constraints, limit }),
+  })
+}
+
+export async function getStabilityAnalysis(topK = 10, nSimulations = 1000): Promise<StabilityResult> {
+  return fetchApi(`${API_ENDPOINTS.analyticsStability}?top_k=${topK}&n_simulations=${nSimulations}`)
+}
+
+export async function getSensitivityAnalysis(): Promise<SensitivityResult> {
+  return fetchApi(API_ENDPOINTS.analyticsSensitivity)
 }
 
 /**

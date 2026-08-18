@@ -1,5 +1,7 @@
 # db/manager.py
 import sqlite3
+import os
+import shutil
 from enum import Enum
 from typing import Dict, Any, List
 import logging
@@ -10,7 +12,7 @@ from db.migrations import MigrationManager, ALL_MIGRATIONS
 
 from services.biosensor_service import DatabaseAdapter
 
-DB_NAME = "memristive_biosensor.db"
+DB_NAME = os.getenv("DATABASE_PATH", "memristive_biosensor.db")
 
 logger = logging.getLogger(__name__)
 
@@ -86,16 +88,65 @@ class DatabaseManager(DatabaseAdapter):
     def __init__(self, db_name: str = DB_NAME):
         self.db_name = db_name
         self.logger = logger
-        
-         # Применить миграции ПЕРЕД созданием таблиц
-        migrator = MigrationManager(db_name)
-        migrator.migrate(ALL_MIGRATIONS)
-        
+        # Если есть бэкап и основная БД пуста/потеряла данные — восстановим из бэкапа
+        try:
+            backup_path = f"{db_name}.backup"
+            if os.path.exists(backup_path):
+                need_restore = False
+                # Если база не существует — восстановим
+                if not os.path.exists(db_name):
+                    need_restore = True
+                else:
+                    try:
+                        with sqlite3.connect(db_name) as conn_main, sqlite3.connect(backup_path) as conn_bak:
+                            cursor_main = conn_main.cursor()
+                            cursor_bak = conn_bak.cursor()
+                            # Проверяем суммарное количество строк в ключевых таблицах
+                            tables = ["Analytes", "BioRecognitionLayers", "ImmobilizationLayers", "MemristiveLayers"]
+                            main_count = 0
+                            bak_count = 0
+                            for t in tables:
+                                try:
+                                    cursor_main.execute(f"SELECT COUNT(1) FROM {t}")
+                                    main_count += cursor_main.fetchone()[0]
+                                except sqlite3.Error:
+                                    # Таблица отсутствует или ошибка — считаем как 0
+                                    pass
+                                try:
+                                    cursor_bak.execute(f"SELECT COUNT(1) FROM {t}")
+                                    bak_count += cursor_bak.fetchone()[0]
+                                except sqlite3.Error:
+                                    pass
+
+                            if bak_count > 0 and main_count == 0:
+                                need_restore = True
+                    except sqlite3.Error:
+                        # Если не удалось прочитать, не восстанавливаем автоматически
+                        need_restore = False
+
+                if need_restore:
+                    try:
+                        shutil.copy2(backup_path, db_name)
+                        self.logger.info(f"БД восстановлена из бэкапа: {backup_path} -> {db_name}")
+                    except Exception as e:
+                        self.logger.error(f"Не удалось восстановить БД из бэкапа: {e}")
+        except Exception:
+            # Не критично, продолжаем — мигратор сам создаст таблицы
+            pass
+
+        # Создать текущую схему для свежей БД, затем применить миграции к существующей схеме.
         try:
             self.create_tables()
         except sqlite3.Error as e:
             self.logger.critical(f"Не удалось инициализировать БД: {e}")
             raise DatabaseConnectionError(f"Ошибка подключения к {db_name}") from e
+
+        migrator = MigrationManager(db_name)
+        try:
+            migrator.migrate(ALL_MIGRATIONS, conn=get_connection())
+        except Exception:
+            # Fallback to path-based migration if connection-based fails
+            migrator.migrate(ALL_MIGRATIONS)
 
     def create_tables(self) -> None:
         """Создание таблиц базы данных, если они не существуют."""
@@ -211,6 +262,7 @@ class DatabaseManager(DatabaseAdapter):
                 PC_total REAL,
                 Score REAL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_test INTEGER DEFAULT 0,
                 FOREIGN KEY (TA_ID) REFERENCES Analytes (TA_ID),
                 FOREIGN KEY (BRE_ID) REFERENCES BioRecognitionLayers (BRE_ID),
                 FOREIGN KEY (IM_ID) REFERENCES ImmobilizationLayers (IM_ID),
@@ -262,6 +314,48 @@ class DatabaseManager(DatabaseAdapter):
                     cursor.execute(table)
                 conn.commit()
                 self.logger.info("Таблицы успешно созданы")
+                # Ensure protective triggers use updated logic (allow deletion of test-like IDs)
+                try:
+                    table_id_map = {
+                        "Analytes": "TA_ID",
+                        "BioRecognitionLayers": "BRE_ID",
+                        "ImmobilizationLayers": "IM_ID",
+                        "MemristiveLayers": "MEM_ID",
+                        "SensorCombinations": "Combo_ID",
+                    }
+                    for tbl, id_col in table_id_map.items():
+                        try:
+                            cursor.execute(f"PRAGMA table_info({tbl})")
+                            cols = [r[1] for r in cursor.fetchall()]
+                        except sqlite3.Error:
+                            continue
+
+                        if "is_test" not in cols:
+                            continue
+
+                        trigger_name = f"protect_delete_{tbl}"
+                        try:
+                            cursor.execute(f"DROP TRIGGER IF EXISTS {trigger_name}")
+                        except sqlite3.Error:
+                            pass
+
+                        # Recreate trigger with permissive test-id matching
+                        cursor.execute(f"""
+                            CREATE TRIGGER {trigger_name}
+                            BEFORE DELETE ON {tbl}
+                            FOR EACH ROW
+                            WHEN (
+                                (OLD.is_test IS NULL OR OLD.is_test = 0)
+                                AND (COALESCE(OLD.{id_col}, '') NOT LIKE '%_TEST%' AND COALESCE(OLD.{id_col}, '') NOT LIKE '%_DUP%' AND COALESCE(OLD.{id_col}, '') NOT LIKE '%TEST%')
+                            )
+                            BEGIN
+                                SELECT RAISE(ABORT, 'Attempt to delete non-test data is forbidden');
+                            END;
+                        """)
+                    conn.commit()
+                except Exception:
+                    # Non-fatal — triggers are protective but not critical for startup
+                    pass
         except sqlite3.Error as e:
             self.logger.error(f"Ошибка создания таблиц: {e}")
 
@@ -291,15 +385,22 @@ class DatabaseManager(DatabaseAdapter):
 
                 query = """
                 INSERT OR REPLACE INTO Analytes (
-                    TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC,
+                    TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, HL, PC, is_test,
                     source_type, source_doi, source_date, reliability_category, data_completeness
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
+                # Normalize is_test input
+                is_test_val = data.get('is_test', data.get('isTest', 0))
+                try:
+                    is_test_val = 1 if str(is_test_val).strip().lower() in {"1", "true", "yes", "y", "t"} else 0
+                except Exception:
+                    is_test_val = 0
+
                 cursor.execute(query, (
                     ta_id, ta_name, ph_min,
                     ph_max, t_max, st,
-                    hl, pc,
+                    hl, pc, is_test_val,
                     source_type, source_doi, source_date, reliability_category, data_completeness
                 ))
                 conn.commit()
@@ -525,14 +626,14 @@ class DatabaseManager(DatabaseAdapter):
 
                 query = """
                 INSERT OR REPLACE INTO SensorCombinations 
-                (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (Combo_ID, TA_ID, BRE_ID, IM_ID, MEM_ID, SN_total, TR_total, ST_total, RP_total, LOD_total, DR_total, HL_total, PC_total, Score, created_at, is_test)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (
                     combo_id, ta_id, bre_id, im_id,
                     mem_id, sn_total, tr_total, st_total,
                     rp_total, lod_total, dr_total, hl_total,
-                    pc_total, score, created_at
+                    pc_total, score, created_at, data.get('is_test', 0)
                 ))
                 conn.commit()
                 self.clear_cache()
@@ -548,12 +649,70 @@ class DatabaseManager(DatabaseAdapter):
             self.logger.error(f"Ошибка БД: {e}")
             return False
 
+    def delete_sensor_combinations(
+        self,
+        combo_ids: List[str] | None = None,
+        only_test: bool = True,
+        allow_non_test: bool = False,
+    ) -> int:
+        """Безопасное удаление комбинаций из SensorCombinations.
+
+        По умолчанию удаляются только тестовые комбинации: либо те, где `is_test = 1`,
+        либо те, чей `Combo_ID`/связанные ID содержат суффиксы `_TEST` или `_DUP`.
+        При `allow_non_test=True` можно явно удалить и нетестовые комбинации.
+        """
+        try:
+            with get_connection() as conn:
+                cursor = conn.cursor()
+
+                column_exists = False
+                try:
+                    cursor.execute("PRAGMA table_info(SensorCombinations)")
+                    column_exists = any(row[1] == "is_test" for row in cursor.fetchall())
+                except sqlite3.Error:
+                    column_exists = False
+
+                if combo_ids:
+                    placeholders = ", ".join("?" for _ in combo_ids)
+                    where_clause = f"Combo_ID IN ({placeholders})"
+                    params: List[Any] = list(combo_ids)
+                else:
+                    where_clause = "1=1"
+                    params = []
+
+                if only_test and not allow_non_test:
+                    test_predicate = "Combo_ID LIKE '%TEST%' OR Combo_ID LIKE '%_DUP%' OR Combo_ID LIKE '%_TEST%'"
+                    if column_exists:
+                        test_predicate = f"({test_predicate} OR is_test = 1)"
+                    where_clause += f" AND ({test_predicate})"
+
+                if only_test and not allow_non_test and column_exists:
+                    cursor.execute(
+                        f"UPDATE SensorCombinations SET is_test = 1 WHERE {where_clause}",
+                        params,
+                    )
+
+                cursor.execute(
+                    f"DELETE FROM SensorCombinations WHERE {where_clause}",
+                    params,
+                )
+                conn.commit()
+                self.clear_cache()
+                deleted_count = cursor.rowcount
+                self.logger.info(
+                    f"Удалено {deleted_count} комбинаций из SensorCombinations"
+                )
+                return deleted_count
+        except sqlite3.Error as e:
+            self.logger.error(f"Ошибка удаления комбинаций сенсоров: {e}")
+            return 0
+
     # --- LIST методы с кэшем ---
     @lru_cache(maxsize=32)
     def list_all_analytes(self) -> List[Dict[str, Any]]:
         """Получение всех аналитов с выбором конкретных столбцов."""
         query = """
-        SELECT TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST
+        SELECT TA_ID, TA_Name, PH_Min, PH_Max, T_Max, ST, is_test
         FROM Analytes
         ORDER BY TA_Name
         """

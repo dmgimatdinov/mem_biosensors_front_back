@@ -124,6 +124,29 @@ class PassportService:
         try:
             with get_connection() as conn:
                 cursor = conn.cursor()
+                # Защищаем нетестовые данные: разрешаем удаление только если запись помечена is_test=1
+                # или если id явно выглядит как тестовый (суффиксы _TEST или _DUP).
+                cursor.execute(
+                    f"SELECT is_test FROM {table_map[entity_type]} WHERE {id_map[entity_type]} = ?",
+                    (entity_id,)
+                )
+                row = cursor.fetchone()
+                allow_delete = False
+                if row is not None:
+                    try:
+                        is_test_flag = int(row[0]) if row[0] is not None else 0
+                    except Exception:
+                        is_test_flag = 0
+                    if is_test_flag == 1:
+                        allow_delete = True
+
+                # Allow deletion for legacy test ids
+                if entity_id.endswith("_TEST") or entity_id.endswith("_DUP"):
+                    allow_delete = True
+
+                if not allow_delete:
+                    return False, "❌ Удаление запрещено для нетестовых данных"
+
                 cursor.execute(
                     f"DELETE FROM {table_map[entity_type]} WHERE {id_map[entity_type]} = ?",
                     (entity_id,)

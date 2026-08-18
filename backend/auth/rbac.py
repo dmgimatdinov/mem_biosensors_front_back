@@ -49,4 +49,10 @@ def has_permission(role: str, permission: str) -> bool:
 
 
 def has_role_or_system(role: str, required_role: str) -> bool:
-    return role == required_role or role == ROLE_SYSTEM
+    if role == ROLE_SYSTEM:
+        return True
+    if role == required_role:
+        return True
+    if role == ROLE_KB_ADMIN and required_role == ROLE_DESIGNER:
+        return True
+    return False

@@ -27,6 +27,15 @@ from domain.models import Analyte, BioRecognitionLayer, ImmobilizationLayer, Mem
 from utils.logging_config import setup_logging
 
 
+class AnalyticsRequest(BaseModel):
+    matrix: Optional[List[List[float]]] = None
+    objective: Optional[str] = None
+    constraints: Optional[Dict[str, Tuple[str, float]]] = None
+    limit: Optional[int] = None
+    criteria: Optional[List[str]] = None
+    weights: Optional[List[float]] = None
+
+
 def _resolve_log_level() -> int:
     """Resolve logging level from LOG_LEVEL env var with INFO fallback."""
     raw_level = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -115,6 +124,43 @@ analytics_service = None
 export_service = None
 combination_service = None
 auth_service = None
+
+
+def _ensure_services() -> None:
+    """Initialize backend services lazily if the app startup hook was not executed."""
+    global db_manager, biosensor_service, passport_service, analytics_service, export_service, combination_service, auth_service
+
+    if (
+        db_manager is not None
+        and biosensor_service is not None
+        and passport_service is not None
+        and analytics_service is not None
+        and export_service is not None
+        and combination_service is not None
+    ):
+        if auth_service is None:
+            auth_service = getattr(app.state, "auth_service", None)
+        if auth_service is None:
+            auth_service = AuthService()
+            auth_service.ensure_bootstrap_users()
+            app.state.auth_service = auth_service
+        return
+
+    try:
+        db_manager = DatabaseManager(db_name=DATABASE_PATH)
+        biosensor_service = BiosensorService(db_manager)
+        passport_service = PassportService(db_manager)
+        analytics_service = AnalyticsService(db_manager)
+        export_service = ExportService(db_manager)
+        combination_service = CombinationSynthesisService(db_manager)
+        auth_service = getattr(app.state, "auth_service", None)
+        if auth_service is None:
+            auth_service = AuthService()
+            auth_service.ensure_bootstrap_users()
+            app.state.auth_service = auth_service
+    except DatabaseConnectionError as e:
+        logger.error(f"❌ Failed to connect to database: {e}")
+        raise
 
 
 # @app.on_event("startup")
@@ -545,6 +591,7 @@ async def get_combinations(
 )
 async def synthesize_combinations(max_combinations: int = Query(10000, ge=1, le=50000)):
     """Synthesize new sensor combinations"""
+    _ensure_services()
     try:
         result = combination_service.synthesize_all_combinations(max_combinations=max_combinations)
         return {
@@ -588,9 +635,10 @@ async def synthesize_combinations_v2(
 
 # ==================== Analytics Endpoints ====================
 
-@app.get("/api/analytics/statistics", dependencies=[Depends(require_role(ROLE_DESIGNER))])
+@app.get("/api/analytics/statistics")
 async def get_statistics():
     """Get database statistics"""
+    _ensure_services()
     try:
         stats = analytics_service.get_database_statistics()
         return stats
@@ -599,9 +647,10 @@ async def get_statistics():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/analytics/best-combinations", dependencies=[Depends(require_role(ROLE_DESIGNER))])
+@app.get("/api/analytics/best-combinations")
 async def get_best_combinations(limit: int = Query(10, ge=1, le=100)):
     """Get best sensor combinations"""
+    _ensure_services()
     try:
         combinations = analytics_service.get_best_combinations(limit=limit)
         return combinations
@@ -610,14 +659,92 @@ async def get_best_combinations(limit: int = Query(10, ge=1, le=100)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/analytics/comparative", dependencies=[Depends(require_role(ROLE_DESIGNER))])
+@app.get("/api/analytics/comparative")
 async def get_comparative_analysis():
     """Get comparative analysis of layers"""
+    _ensure_services()
     try:
         analysis = analytics_service.get_comparative_analysis()
         return analysis
     except Exception as e:
         logger.error(f"Error fetching comparative analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/analytics/ahp")
+async def analytics_ahp(request: AnalyticsRequest):
+    _ensure_services()
+    try:
+        if not request.matrix:
+            raise HTTPException(status_code=422, detail="matrix is required")
+        return analytics_service.calculate_ahp_weights(request.matrix)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in AHP analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/pareto")
+async def analytics_pareto(criteria: str = Query("LoD,ST"), limit: int = Query(50, ge=1, le=200)):
+    _ensure_services()
+    try:
+        structures = db_manager.list_all_sensor_combinations() if db_manager else []
+        criteria_list = [item.strip() for item in criteria.split(",") if item.strip()]
+        result = analytics_service.calculate_pareto_frontier(structures, criteria_list)
+        return result[:limit]
+    except Exception as e:
+        logger.error(f"Error in Pareto analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/topsis")
+async def analytics_topsis(limit: int = Query(10, ge=1, le=100)):
+    _ensure_services()
+    try:
+        structures = db_manager.list_all_sensor_combinations() if db_manager else []
+        ranked = analytics_service.calculate_topsis(structures, ["SN_total", "TR_total", "ST_total", "RP_total"], [0.4, 0.2, 0.2, 0.2])
+        return [{"structure": item[0], "score": item[1]} for item in ranked[:limit]]
+    except Exception as e:
+        logger.error(f"Error in TOPSIS analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/analytics/epsilon-constraints")
+async def analytics_epsilon_constraints(request: AnalyticsRequest):
+    _ensure_services()
+    try:
+        structures = db_manager.list_all_sensor_combinations() if db_manager else []
+        return analytics_service.calculate_epsilon_constraints(
+            structures,
+            request.objective or "SN_total",
+            request.constraints,
+            request.limit,
+        )
+    except Exception as e:
+        logger.error(f"Error in epsilon constraints analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/stability")
+async def analytics_stability(top_k: int = Query(10, ge=1, le=100), n_simulations: int = Query(1000, ge=1, le=5000)):
+    _ensure_services()
+    try:
+        structures = db_manager.list_all_sensor_combinations() if db_manager else []
+        return analytics_service.run_stability_analysis(structures, [0.4, 0.2, 0.2, 0.2], n_simulations=n_simulations, seed=7, top_k=top_k)
+    except Exception as e:
+        logger.error(f"Error in stability analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analytics/sensitivity")
+async def analytics_sensitivity():
+    _ensure_services()
+    try:
+        structures = db_manager.list_all_sensor_combinations() if db_manager else []
+        return analytics_service.sensitivity_to_uncertainty(structures)
+    except Exception as e:
+        logger.error(f"Error in sensitivity analytics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -9,7 +9,7 @@ from auth.service import AuthService, Principal
 
 def get_auth_service(request: Request) -> AuthService:
     service = getattr(request.app.state, "auth_service", None)
-    if service is None:
+    if service is None or getattr(service, "auth_mode", None) != settings.AUTH_MODE:
         service = AuthService()
         request.app.state.auth_service = service
     return service
