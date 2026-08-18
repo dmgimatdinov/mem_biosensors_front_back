@@ -64,3 +64,8 @@ desktop/data/
 *.exe
 !desktop/build.bat
 !desktop/build.sh
+
+# Portable Frontend build artifacts
+portable-frontend/dist/
+portable-frontend/*.zip
+portable-frontend/logs/
