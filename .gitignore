@@ -75,7 +75,7 @@ Dockerfile_old
 
 Доработка.md
 Спецификация.md
-тестирование.md
+тестирование_ci.md
 
 .coverage
 backend/tests/__pycache__/conftest.cpython-311-pytest-9.0.2.pyc
